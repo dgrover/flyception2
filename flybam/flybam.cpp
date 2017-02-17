@@ -186,8 +186,11 @@ int _tmain(int argc, _TCHAR* argv[])
 	int arena_image_width = 512, arena_image_height = 512;
 	int arena_image_left = 384, arena_image_top = 256;
 
-	//int fly_image_width = 256, fly_image_height = 256;
 	int fly_image_width = 240, fly_image_height = 240;
+
+	Point el_center(261, 219);
+	int el_maj_axis = 236, el_min_axis = 138;
+	int el_angle = 178;
 
 	//int edge_min = 1;
 	//int edge_max = fly_image_width - 2;
@@ -198,12 +201,35 @@ int _tmain(int argc, _TCHAR* argv[])
 	PGRGuid guid;
 	FlyCapture2::Error error;
 
-	string filename = "..\\calibration\\arena\\camera_projection_data.xml";
+	//string filename = "..\\calibration\\arena\\camera_projection_data.xml";
 
-	Mat cameraMatrix, distCoeffs;
-	Mat rvec(1, 3, cv::DataType<double>::type);
-	Mat tvec(1, 3, cv::DataType<double>::type);
-	Mat rotationMatrix(3, 3, cv::DataType<double>::type);
+	//Mat cameraMatrix, distCoeffs;
+	//Mat rvec(1, 3, cv::DataType<double>::type);
+	//Mat tvec(1, 3, cv::DataType<double>::type);
+	//Mat rotationMatrix(3, 3, cv::DataType<double>::type);
+
+	fstream map("..\\calibration\\raster\\fmfrecord\\map.txt", ios_base::in);
+
+	vector<Point2f> raster_pts;
+	vector<Point2f> raster_angles;
+	
+	Point2f raster_pt;
+	Point2f raster_ang;
+
+	while (map >> raster_ang.x >> raster_ang.y >> raster_pt.x >> raster_pt.y)
+	{
+		if (raster_pt.x != 0 && raster_pt.y != 0)
+		{
+			raster_pts.push_back(raster_pt);
+			raster_angles.push_back(raster_ang);
+
+			//printf("%f %f %f %f\n", raster_pt.x, raster_pt.y, raster_ang.x, raster_ang.y);
+		}
+	}
+
+
+
+
 
 	FVFmfWriter fvfout;
 	AVFmfWriter avfout;
@@ -245,13 +271,13 @@ int _tmain(int argc, _TCHAR* argv[])
 	}
 	printf("[OK]\n");
 
-	FileStorage fs(filename, FileStorage::READ);
-	fs["camera_matrix"] >> cameraMatrix;
-	fs["distortion_coefficients"] >> distCoeffs;
-	fs["rvec"] >> rvec;
-	fs["tvec"] >> tvec;
-	fs["rotation_matrix"] >> rotationMatrix;
-	fs.release();
+	//FileStorage fs(filename, FileStorage::READ);
+	//fs["camera_matrix"] >> cameraMatrix;
+	//fs["distortion_coefficients"] >> distCoeffs;
+	//fs["rvec"] >> rvec;
+	//fs["tvec"] >> tvec;
+	//fs["rotation_matrix"] >> rotationMatrix;
+	//fs.release();
 
 	//calculating galvo center position in pixel coordinates
 	//Point3f galvo_center_3d(0, 0, (BASE_HEIGHT - sqrt((GALVO_Y_HEIGHT * GALVO_Y_HEIGHT) - (ARENA_RADIUS * ARENA_RADIUS))));
@@ -282,10 +308,13 @@ int _tmain(int argc, _TCHAR* argv[])
 	ndq.start();
 
 	//create arena mask
-	Mat outer_mask = Mat::zeros(Size(arena_image_width, arena_image_height), CV_8UC1);
-	RotatedRect arenaMask = createArenaMask(ARENA_X_RADIUS, ARENA_Y_RADIUS, cameraMatrix, distCoeffs, rvec, tvec);
+	//Mat outer_mask = Mat::zeros(Size(arena_image_width, arena_image_height), CV_8UC1);
+	//RotatedRect arenaMask = createArenaMask(ARENA_X_RADIUS, ARENA_Y_RADIUS, cameraMatrix, distCoeffs, rvec, tvec);
 	//RotatedRect arenaMask = createArenaMask(ARENA_X_RADIUS + 2.0, ARENA_Y_RADIUS + 2.0, cameraMatrix, distCoeffs, rvec, tvec);
-	ellipse(outer_mask, arenaMask, Scalar(255, 255, 255), FILLED);
+	//ellipse(outer_mask, arenaMask, Scalar(255, 255, 255), FILLED);
+
+	Mat outer_mask = Mat::zeros(Size(arena_image_width, arena_image_height), CV_8UC1);
+	ellipse(outer_mask, el_center, Size(el_maj_axis, el_min_axis), el_angle, 0, 360, Scalar(255, 255, 255), FILLED);
 
 	Mat arena_img, arena_frame, arena_mask;
 	Mat fly_img, fly_frame, fly_fg, fly_mask;
@@ -310,7 +339,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	int lost = 0;
 	
-	//Press [F1] to start/stop tracking, [F2] to start/stop recording, [F3] to fire flash, [ESC] to exit.
+	//Press [F1] to start/stop tracking, [F2] to start/stop recording, [ESC] to exit.
 	#pragma omp parallel sections num_threads(7)
 	{
 		#pragma omp section
@@ -594,7 +623,11 @@ int _tmain(int argc, _TCHAR* argv[])
 								//putText(arena_frame, to_string(i), est, FONT_HERSHEY_COMPLEX, 0.2, Scalar(255, 255, 255));
 
 								arena_pt[i] = arena_ctr_pts[j];
-								pt[i] = backProject(arena_pt[i], cameraMatrix, rotationMatrix, tvec, BASE_HEIGHT);
+								pt[i] = arena_pt[i];
+
+								// HERE convert arena pixel coordinate to galvo angle 
+								//pt[i] = backProject(arena_pt[i], cameraMatrix, rotationMatrix, tvec, BASE_HEIGHT);
+								
 								//arena_pt_vec[i].push_back(arena_pt[i]);
 
 								putText(arena_frame, to_string(i), arena_pt[i], FONT_HERSHEY_COMPLEX, 0.2, Scalar(255, 255, 255));
@@ -627,7 +660,10 @@ int _tmain(int argc, _TCHAR* argv[])
 								//putText(arena_frame, to_string(arena_pt_ind[j]), est, FONT_HERSHEY_COMPLEX, 0.2, Scalar(255, 255, 255));
 
 								arena_pt[arena_pt_ind[j]] = arena_ctr_pts[i];
-								pt[arena_pt_ind[j]] = backProject(arena_pt[arena_pt_ind[j]], cameraMatrix, rotationMatrix, tvec, BASE_HEIGHT);
+								pt[arena_pt_ind[j]] = arena_pt[arena_pt_ind[j]];
+								
+								// HERE convert arena pixel coordinate to galvo angle 
+								//pt[arena_pt_ind[j]] = backProject(arena_pt[arena_pt_ind[j]], cameraMatrix, rotationMatrix, tvec, BASE_HEIGHT);
 
 								putText(arena_frame, to_string(arena_pt_ind[j]), arena_pt[arena_pt_ind[j]], FONT_HERSHEY_COMPLEX, 0.2, Scalar(255, 255, 255));
 
@@ -646,8 +682,13 @@ int _tmain(int argc, _TCHAR* argv[])
 
 						if (!flyview_track && !manual_track)
 						{
-							ndq.ConvertPtToDeg(pt[focal_fly]);
+							int j = findClosestPoint(pt[focal_fly], raster_pts);
+							ndq.SetGalvoAngles(raster_angles[j]);
 							ndq.write();
+
+							//ndq.ConvertPtToDeg(pt[focal_fly]);
+							//ndq.SetGalvoAngles();
+							//ndq.write();
 						}
 					}
 
@@ -759,11 +800,17 @@ int _tmain(int argc, _TCHAR* argv[])
 			if (NFLIES > 1)
 				createTrackbar("focal fly", "controls", &focal_fly, NFLIES-1);
 			
-			createTrackbar("FE", "controls", &fly_erode, 5);
-			createTrackbar("FD", "controls", &fly_dilate, 5);
+			createTrackbar("fly erode", "controls", &fly_erode, 5);
+			createTrackbar("fly dilate", "controls", &fly_dilate, 5);
+			createTrackbar("arena erode", "controls", &arena_erode, 5);
+			createTrackbar("arena dilate", "controls", &arena_dilate, 5);
 
-			createTrackbar("AE", "controls", &arena_erode, 5);
-			createTrackbar("AD", "controls", &arena_dilate, 5);
+			namedWindow("parameters", WINDOW_AUTOSIZE);
+			createTrackbar("center x", "parameters", &el_center.x, arena_image_width);
+			createTrackbar("center y", "parameters", &el_center.y, arena_image_height);
+			createTrackbar("major axis", "parameters", &el_maj_axis, arena_image_width / 2);
+			createTrackbar("minor axis", "parameters", &el_min_axis, arena_image_height / 2);
+			createTrackbar("angle", "parameters", &el_angle, 180);
 			
 			Mat tframe, tmask;
 
@@ -771,7 +818,7 @@ int _tmain(int argc, _TCHAR* argv[])
 			{
 				if (arenaDispStream.try_dequeue(tframe))
 				{
-					ellipse(tframe, arenaMask, Scalar(255, 255, 255));
+					ellipse(tframe, el_center, Size(el_maj_axis, el_min_axis), el_angle, 0, 360, Scalar(255, 255, 255));
 					imshow("arena image", tframe);
 				}
 

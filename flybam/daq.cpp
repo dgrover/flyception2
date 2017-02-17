@@ -83,6 +83,12 @@ Point2f Daq::GetGalvoAngles()
 	return angle;
 }
 
+void Daq::SetGalvoAngles(Point2f angle)
+{
+	thetax = angle.x;
+	thetay = angle.y;
+}
+
 void Daq::MoveLeft()
 {
 	thetax += 0.1;

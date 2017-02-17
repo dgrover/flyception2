@@ -14,8 +14,8 @@ bool record = false;
 int imageWidth = 512, imageHeight = 512;
 int imageLeft = 384, imageTop = 256;
 
-Point center(255, 222);
-int maj_axis = 232, min_axis = 138;
+Point center(263, 219);
+int maj_axis = 236, min_axis = 138;
 int angle = 178;
 
 ReaderWriterQueue<Image> q(30);
@@ -137,7 +137,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	error = cam.SetCameraParameters(imageLeft, imageTop, imageWidth, imageHeight);
 	
 	//error = cam.SetTrigger();
-	error = cam.SetProperty(FRAME_RATE, 10);
+	error = cam.SetProperty(FRAME_RATE, 100);
 	error = cam.SetProperty(SHUTTER, 2.300);
 	error = cam.SetProperty(GAIN, 0.0);
 	error = cam.cam.StartCapture(OnImageGrabbed);

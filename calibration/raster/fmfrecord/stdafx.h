@@ -30,14 +30,14 @@
 #include <NIDAQmx.h>
 #include "daq.h"
 
-#define XVOLTPERDEGREE 0.55
-#define YVOLTPERDEGREE 0.525
+#define XVOLTPERDEGREE 0.5 //0.55
+#define YVOLTPERDEGREE 0.5 //0.525
 
 #define XOFFSET 0.0		// x-offset for centering galvo to target (in volts)
 #define YOFFSET 0.0		// y-offset for centering galvo to target (in volts)
 
-#define MIN_ANGLE -8
-#define MAX_ANGLE 8
-#define ANGLE_STEP_SIZE 0.25
+#define MIN_ANGLE -7
+#define MAX_ANGLE 7
+#define ANGLE_STEP_SIZE 0.1
 
 // TODO: reference additional headers your program requires here
