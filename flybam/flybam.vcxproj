@@ -146,25 +146,20 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="arduino.h" />
     <ClInclude Include="avfmfwriter.h" />
     <ClInclude Include="daq.h" />
     <ClInclude Include="ExampleUtils.h" />
-    <ClInclude Include="fmfreader.h" />
     <ClInclude Include="fvfmfwriter.h" />
     <ClInclude Include="pgrcam.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
-    <ClInclude Include="tracker.h" />
     <ClInclude Include="utility.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="arduino.cpp" />
     <ClCompile Include="avfmfwriter.cpp" />
     <ClCompile Include="daq.cpp" />
     <ClCompile Include="ExampleUtils.cpp" />
     <ClCompile Include="flybam.cpp" />
-    <ClCompile Include="fmfreader.cpp" />
     <ClCompile Include="fvfmfwriter.cpp" />
     <ClCompile Include="pgrcam.cpp" />
     <ClCompile Include="stdafx.cpp">
@@ -173,7 +168,6 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="tracker.cpp" />
     <ClCompile Include="utility.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

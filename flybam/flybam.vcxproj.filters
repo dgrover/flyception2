@@ -27,16 +27,7 @@
     <ClInclude Include="daq.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="fmfreader.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="pgrcam.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="tracker.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="arduino.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="utility.h">
@@ -62,16 +53,7 @@
     <ClCompile Include="daq.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="fmfreader.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="pgrcam.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="tracker.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="arduino.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="utility.cpp">

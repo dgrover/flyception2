@@ -13,16 +13,11 @@ using namespace concurrency;
 bool stream = true;
 
 bool flyview_track = false;
-bool manual_track = false;
+bool manual_track = true;
 
 bool flyview_record = false;
 bool arenaview_record = false;
-
-//bool odor_present = false;
-
-struct {
-	bool operator() (cv::Vec4i pt1, cv::Vec4i pt2) { return (pt1[3] > pt2[3]); }
-} mycomp_dsize;
+bool arenaview_mask = false;
 
 struct fvwritedata
 {
@@ -30,10 +25,7 @@ struct fvwritedata
 	int stamp;
 	Point2f laser;
 	Point2f head;
-	//Point2f edge;
 	Point2f galvo_angle;
-	//int odor;
-	//float body_angle;
 };
 
 struct avwritedata
@@ -87,59 +79,12 @@ void OnImageGrabbed(Image* pImage, const void* pCallbackData)
 	return;
 }
 
-//vector<vector<Point>> findLargestContour(Mat mask, int &j, float &max_size, int &contour_count, Point2f &pt)
-//{
-//	vector<vector<Point>> fly_contours;
-//	findContours(mask, fly_contours, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE);
-//
-//	int nrow = mask.rows;
-//	int ncol = mask.cols;
-//
-//	mask = Mat::zeros(Size(ncol, nrow), CV_8UC1);
-//	contour_count = 0;
-//
-//	if (fly_contours.size() > 0)
-//	{
-//		max_size = 0;
-//
-//		// Get the moments and mass centers
-//		vector<Moments> fly_mu(fly_contours.size());
-//		vector<Point2f> fly_mc(fly_contours.size());
-//
-//		for (int i = 0; i < fly_contours.size(); i++)
-//		{
-//			//drawContours(mask, fly_contours, i, Scalar(255, 255, 255), FILLED, 1);
-//			fly_mu[i] = moments(fly_contours[i], false);
-//			fly_mc[i] = Point2f(fly_mu[i].m10 / fly_mu[i].m00, fly_mu[i].m01 / fly_mu[i].m00);
-//
-//			double csize = contourArea(fly_contours[i]);
-//
-//			if (csize > 5)
-//				contour_count++;
-//
-//			if (csize > max_size)
-//			{
-//				j = i;
-//				max_size = csize;
-//			}
-//
-//		}
-//
-//		drawContours(mask, fly_contours, j, Scalar(255, 255, 255), FILLED, 0);
-//
-//		pt = fly_mc[j];
-//	}
-//
-//	return fly_contours;
-//}
-
-
 int _tmain(int argc, _TCHAR* argv[])
 {
-	SapAcquisition		*Acq = NULL;
-	SapBuffer			*Buffers = NULL;
-	SapView				*View = NULL;
-	SapTransfer			*Xfer = NULL;
+	SapAcquisition	*Acq	 = NULL;
+	SapBuffer		*Buffers = NULL;
+	SapView			*View	 = NULL;
+	SapTransfer		*Xfer	 = NULL;
 	
 	UINT32   acqDeviceNumber;
 	char*    acqServerName = new char[CORSERVER_MAX_STRLEN];
@@ -188,25 +133,15 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	int fly_image_width = 240, fly_image_height = 240;
 
-	Point el_center(261, 219);
+	Point el_center(243, 217);
 	int el_maj_axis = 236, el_min_axis = 138;
 	int el_angle = 178;
-
-	//int edge_min = 1;
-	//int edge_max = fly_image_width - 2;
 
 	PGRcam arena_cam;
 	BusManager busMgr;
 	unsigned int numCameras;
 	PGRGuid guid;
 	FlyCapture2::Error error;
-
-	//string filename = "..\\calibration\\arena\\camera_projection_data.xml";
-
-	//Mat cameraMatrix, distCoeffs;
-	//Mat rvec(1, 3, cv::DataType<double>::type);
-	//Mat tvec(1, 3, cv::DataType<double>::type);
-	//Mat rotationMatrix(3, 3, cv::DataType<double>::type);
 
 	fstream map("..\\calibration\\raster\\fmfrecord\\map.txt", ios_base::in);
 
@@ -222,22 +157,14 @@ int _tmain(int argc, _TCHAR* argv[])
 		{
 			raster_pts.push_back(raster_pt);
 			raster_angles.push_back(raster_ang);
-
-			//printf("%f %f %f %f\n", raster_pt.x, raster_pt.y, raster_ang.x, raster_ang.y);
 		}
 	}
-
-
-
-
 
 	FVFmfWriter fvfout;
 	AVFmfWriter avfout;
 
-	//vector<Tracker> tkf(NFLIES);
 	vector<Point2f> pt(NFLIES);
 	vector<Point2f> arena_pt(NFLIES);
-	//vector<vector<Point2f>> arena_pt_vec(NFLIES);
 
 	fvwritedata fvin;
 	avwritedata avin;
@@ -271,55 +198,20 @@ int _tmain(int argc, _TCHAR* argv[])
 	}
 	printf("[OK]\n");
 
-	//FileStorage fs(filename, FileStorage::READ);
-	//fs["camera_matrix"] >> cameraMatrix;
-	//fs["distortion_coefficients"] >> distCoeffs;
-	//fs["rvec"] >> rvec;
-	//fs["tvec"] >> tvec;
-	//fs["rotation_matrix"] >> rotationMatrix;
-	//fs.release();
-
-	//calculating galvo center position in pixel coordinates
-	//Point3f galvo_center_3d(0, 0, (BASE_HEIGHT - sqrt((GALVO_Y_HEIGHT * GALVO_Y_HEIGHT) - (ARENA_RADIUS * ARENA_RADIUS))));
-	//Point2f galvo_center_2d = project3d2d(Point2f(0, 0), cameraMatrix, distCoeffs, rvec, tvec);
-
-	//initializing galvo to arena center in pixel coordinates
-	//for (int i = 0; i < NFLIES; i++)
-	//{
-	//	tkf[i].Init(Point2f(0,0));
-		//tkf[i].Init(galvo_center_2d);
-	//}
-
-	//Serial* SP = new Serial("COM6");    // adjust as needed
-
-	//if (SP->IsConnected())
-	//	printf("Connecting arduino [OK]\n");
-
-	//Serial* SPA = new Serial("COM7");    // adjust as needed
-
-	//if (SPA->IsConnected())
-	//	printf("Connecting odor delivery arduino [OK]\n");
-
-	//SPA->WriteData("1", 1);
-
 	//configure and start NIDAQ
 	Daq ndq;
 	ndq.configure();
 	ndq.start();
+	ndq.write();
 
 	//create arena mask
-	//Mat outer_mask = Mat::zeros(Size(arena_image_width, arena_image_height), CV_8UC1);
-	//RotatedRect arenaMask = createArenaMask(ARENA_X_RADIUS, ARENA_Y_RADIUS, cameraMatrix, distCoeffs, rvec, tvec);
-	//RotatedRect arenaMask = createArenaMask(ARENA_X_RADIUS + 2.0, ARENA_Y_RADIUS + 2.0, cameraMatrix, distCoeffs, rvec, tvec);
-	//ellipse(outer_mask, arenaMask, Scalar(255, 255, 255), FILLED);
-
 	Mat outer_mask = Mat::zeros(Size(arena_image_width, arena_image_height), CV_8UC1);
 	ellipse(outer_mask, el_center, Size(el_maj_axis, el_min_axis), el_angle, 0, 360, Scalar(255, 255, 255), FILLED);
 
 	Mat arena_img, arena_frame, arena_mask;
 	Mat fly_img, fly_frame, fly_fg, fly_mask;
 
-	int arena_thresh = 95;
+	int arena_thresh = 85;
 	int fly_thresh = 50;
 
 	int fly_erode = 0;
@@ -351,12 +243,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 			while (true)
 			{
-				//Point2f pt2d, wpt, edgept, galvo_mirror_angle;
 				Point2f pt2d, wpt, galvo_mirror_angle;
-				//float fly_body_angle = 0.0;
-
-				//for (int i = 0; i < NFLIES; i++)
-				//	pt[i] = tkf[i].Predict();
 
 				if (q.try_pop(tframe))
 				{
@@ -380,13 +267,6 @@ int _tmain(int argc, _TCHAR* argv[])
 						
 						if (flyview_track)
 						{
-							//int contour_count = 0;
-							//float max_size;
-							//int j;
-							
-							//Point2f fly_contour_center;
-							//vector<vector<Point>> fly_contours = findLargestContour(fly_mask, j, max_size, contour_count, fly_contour_center);
-
 							float total_x = 0;
 							float total_y = 0;
 							int contour_count = 0;
@@ -445,43 +325,19 @@ int _tmain(int argc, _TCHAR* argv[])
 							}
 							else
 							{
-								//if (contour_count == 0)
-								//{
 								lost++;
 
 								if (lost > NLOSTFRAMES)
 								{
 									flyview_track = false;
-										
-									// Enable the next two lines to stop recording when flyview tracking is lost
-									//flyview_record = false;
-									//arenaview_record = false;
-										
 									manual_track = false;
 									ndq.reset();
-
-									//pt2d = Point2f(0, 0);
-									//wpt = Point2f(0, 0);
-									//galvo_mirror_angle = Point2f(0, 0);
-									//fly_body_angle = 0.0;
-
-									//for (int i = 0; i < NFLIES; i++)
-									//	tkf[i].Init();
 								}
-								//}
 							}
 						}
-						//else
-						//{
-						//	last_contour_count = 0;
-						//	last_contour_size = 0;
-						//}
 
 						putText(fly_frame, to_string((int)fly_fps), Point((fly_image_width - 50), 10), FONT_HERSHEY_COMPLEX, 0.4, Scalar(255, 255, 255));
-						
-						//putText(fly_frame, to_string(q.size_approx()), Point((fly_image_width - 50), 20), FONT_HERSHEY_COMPLEX, 0.4, Scalar(255, 255, 255));
 						putText(fly_frame, to_string(q.unsafe_size()), Point((fly_image_width - 50), 20), FONT_HERSHEY_COMPLEX, 0.4, Scalar(255, 255, 255));
-
 
 						if (flyview_record)
 							putText(fly_frame, to_string(fvrcount), Point(0, 10), FONT_HERSHEY_COMPLEX, 0.4, Scalar(255, 255, 255));
@@ -491,32 +347,13 @@ int _tmain(int argc, _TCHAR* argv[])
 
 						if (flyview_record)
 						{
-							//if (odor_present)
-							//{
-							//	fvin.odor = 1;
-							//	odor_present = false;
-							//}
-							//else
-							//	fvin.odor = 0;
-
 							fvin.img = fly_img;
 							fvin.stamp = fly_now;
 							fvin.head = pt2d;
-							//fvin.edge = edgept;
 							fvin.laser = wpt;
 							fvin.galvo_angle = galvo_mirror_angle;
-							//fvin.body_angle = fly_body_angle;
 
-							//wdata.enqueue(in);
 							fvwdata.push(fvin);
-
-							//laser_pt.enqueue(wpt);
-							//fly_pt.enqueue(pt2d);
-							//body_angle.enqueue(fly_body_angle);
-
-							//flyTimeStamps.enqueue(fly_now);
-							//flyImageStream.enqueue(fly_img);
-
 							fvrcount++;
 						}
 					}
@@ -536,13 +373,6 @@ int _tmain(int argc, _TCHAR* argv[])
 
 			while (true)
 			{
-				//for (int i = 0; i < NFLIES; i++)
-				//{
-				//	arena_pt[i] = tkf[i].Predict();
-				//	pt[i] = backProject(arena_pt[i], cameraMatrix, rotationMatrix, tvec, BASE_HEIGHT);
-				//}
-
-				//if (aq.try_dequeue(img))
 				if (aq.try_pop(img))
 				{
 					arena_fps = ConvertTimeToFPS(img.GetTimeStamp().cycleCount, arena_last);
@@ -554,33 +384,19 @@ int _tmain(int argc, _TCHAR* argv[])
 					arena_img = tframe.clone();
 					arena_frame = tframe.clone();
 					
-					//Mat arena_tframe = arena_cam.convertImagetoMat(arena_img);
-					//undistort(arena_tframe, arena_frame, cameraMatrix, distCoeffs);
-
 					threshold(arena_frame, arena_mask, arena_thresh, 255, THRESH_BINARY_INV);
 					
-					//if (arena_last_radius != arena_radius)
-					//{
-					//	//create arena mask
-					//	outer_mask = Mat::zeros(Size(arena_image_width, arena_image_height), CV_8UC1);
-					//	arenaMask = createArenaMask(arena_radius, cameraMatrix, distCoeffs, rvec, tvec);
-					//	ellipse(outer_mask, arenaMask, Scalar(255, 255, 255), FILLED);
+					if (arenaview_mask)
+					{
+						outer_mask = Mat::zeros(Size(arena_image_width, arena_image_height), CV_8UC1);
+						ellipse(outer_mask, el_center, Size(el_maj_axis, el_min_axis), el_angle, 0, 360, Scalar(255, 255, 255), FILLED);
+					}
 
-					//	arena_last_radius = arena_radius;
-					//}
-					//else
-					
 					arena_mask &= outer_mask;
 
 					//morphologyEx(arena_mask, arena_mask, MORPH_OPEN, arena_element);
 					erode(arena_mask, arena_mask, arena_element, Point(-1, -1), arena_erode);
 					dilate(arena_mask, arena_mask, arena_element, Point(-1, -1), arena_dilate);
-
-					//cv::Mat dist;
-					//cv::distanceTransform(arena_mask, dist, CV_DIST_L2, 3);
-					//cv::normalize(dist, dist, 0, 1., cv::NORM_MINMAX);
-					//cv::threshold(dist, dist, .5, 1., CV_THRESH_BINARY);
-					//dist.convertTo(arena_mask, CV_8U);
 
 					vector<vector<Point>> arena_contours;
 
@@ -616,27 +432,10 @@ int _tmain(int argc, _TCHAR* argv[])
 							{
 								int j = findClosestPoint(arena_pt[i], arena_ctr_pts);
 
-								//Point2f est = tkf[i].Correct(arena_ctr_pts[j]);
-								//pt[i] = backProject(est, cameraMatrix, rotationMatrix, tvec, BASE_HEIGHT);
-								//arena_pt_vec[i].push_back(est);
-
-								//putText(arena_frame, to_string(i), est, FONT_HERSHEY_COMPLEX, 0.2, Scalar(255, 255, 255));
-
 								arena_pt[i] = arena_ctr_pts[j];
 								pt[i] = arena_pt[i];
 
-								// HERE convert arena pixel coordinate to galvo angle 
-								//pt[i] = backProject(arena_pt[i], cameraMatrix, rotationMatrix, tvec, BASE_HEIGHT);
-								
-								//arena_pt_vec[i].push_back(arena_pt[i]);
-
 								putText(arena_frame, to_string(i), arena_pt[i], FONT_HERSHEY_COMPLEX, 0.2, Scalar(255, 255, 255));
-
-								//for (int k = 0; k < arena_pt_vec[i].size() - 1; k++)
-								//	line(arena_frame, arena_pt_vec[i][k], arena_pt_vec[i][k + 1], Scalar(255, 255, 0), 1);
-
-								//if (arena_pt_vec[i].size() > TAIL_LENGTH)
-								//	arena_pt_vec[i].erase(arena_pt_vec[i].begin());
 
 								arena_ctr_pts.erase(arena_ctr_pts.begin() + j);
 							}
@@ -653,27 +452,10 @@ int _tmain(int argc, _TCHAR* argv[])
 							{
 								int j = findClosestPoint(arena_ctr_pts[i], last_arena_pt);
 
-								//Point2f est = tkf[arena_pt_ind[j]].Correct(arena_ctr_pts[i]);
-								//pt[arena_pt_ind[j]] = backProject(est, cameraMatrix, rotationMatrix, tvec, BASE_HEIGHT);
-								//arena_pt_vec[j].push_back(est);
-
-								//putText(arena_frame, to_string(arena_pt_ind[j]), est, FONT_HERSHEY_COMPLEX, 0.2, Scalar(255, 255, 255));
-
 								arena_pt[arena_pt_ind[j]] = arena_ctr_pts[i];
 								pt[arena_pt_ind[j]] = arena_pt[arena_pt_ind[j]];
 								
-								// HERE convert arena pixel coordinate to galvo angle 
-								//pt[arena_pt_ind[j]] = backProject(arena_pt[arena_pt_ind[j]], cameraMatrix, rotationMatrix, tvec, BASE_HEIGHT);
-
 								putText(arena_frame, to_string(arena_pt_ind[j]), arena_pt[arena_pt_ind[j]], FONT_HERSHEY_COMPLEX, 0.2, Scalar(255, 255, 255));
-
-								//arena_pt_vec[arena_pt_ind[j]].push_back(arena_pt[arena_pt_ind[j]]);
-
-								//for (int k = 0; k < arena_pt_vec[arena_pt_ind[j]].size() - 1; k++)
-								//	line(arena_frame, arena_pt_vec[arena_pt_ind[j]][k], arena_pt_vec[arena_pt_ind[j]][k + 1], Scalar(255, 255, 0), 1);
-
-								//if (arena_pt_vec[arena_pt_ind[j]].size() > TAIL_LENGTH)
-								//	arena_pt_vec[arena_pt_ind[j]].erase(arena_pt_vec[arena_pt_ind[j]].begin());
 
 								last_arena_pt.erase(last_arena_pt.begin() + j);
 								arena_pt_ind.erase(arena_pt_ind.begin() + j);
@@ -685,10 +467,6 @@ int _tmain(int argc, _TCHAR* argv[])
 							int j = findClosestPoint(pt[focal_fly], raster_pts);
 							ndq.SetGalvoAngles(raster_angles[j]);
 							ndq.write();
-
-							//ndq.ConvertPtToDeg(pt[focal_fly]);
-							//ndq.SetGalvoAngles();
-							//ndq.write();
 						}
 					}
 
@@ -738,9 +516,6 @@ int _tmain(int argc, _TCHAR* argv[])
 
 					fvfout.WriteFrame(out.img);
 					fvfout.WriteLog(out.stamp);
-					
-					//fvfout.WriteTraj(out.laser, out.head, out.edge, out.galvo_angle, out.odor);
-					//fvfout.WriteTraj(out.laser, out.head, out.edge, out.galvo_angle);
 					fvfout.WriteTraj(out.laser, out.head, out.galvo_angle);
 					
 					fvfout.nframes++;
@@ -865,6 +640,7 @@ int _tmain(int argc, _TCHAR* argv[])
 			int record_key_state = 0;
 			int track_key_state = 0;
 			int arena_track_key_state = 0;
+			int mask_key_state = 0;
 			
 			int left_key_state = 0;
 			int right_key_state = 0;
@@ -948,13 +724,6 @@ int _tmain(int argc, _TCHAR* argv[])
 						flyview_track = !flyview_track;
 
 						manual_track = false;
-						
-						//Enable next few lines to stop recording when flyview loses track of fly
-						//if (flyview_record)
-						//	flyview_record = !flyview_record;
-
-						//if (arenaview_record)
-						//	arenaview_record = !arenaview_record;
 					}
 
 					track_key_state = 1;
@@ -977,6 +746,16 @@ int _tmain(int argc, _TCHAR* argv[])
 				}
 				else
 					record_key_state = 0;
+
+				if (GetAsyncKeyState(VK_F3))
+				{
+					if (!mask_key_state)
+						arenaview_mask = !arenaview_mask;
+
+					mask_key_state = 1;
+				}
+				else
+					mask_key_state = 0;
 
 				if (GetAsyncKeyState(VK_ESCAPE))
 				{
@@ -1040,8 +819,10 @@ int _tmain(int argc, _TCHAR* argv[])
 	if (Acq)		delete Acq;
 	
 	printf("\n\nCentering galvo ");
-	ndq.ConvertPtToDeg(Point2f(0, 0));
+	
+	ndq.SetGalvoAngles(Point2f(0, 0));
 	ndq.write();
+	
 	printf("[OK]\n");
 
 	return 0;

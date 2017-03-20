@@ -14,9 +14,9 @@ bool record = false;
 int imageWidth = 512, imageHeight = 512;
 int imageLeft = 384, imageTop = 256;
 
-Point center(263, 219);
-int maj_axis = 236, min_axis = 138;
-int angle = 178;
+//Point center(263, 219);
+//int maj_axis = 236, min_axis = 138;
+//int angle = 178;
 
 ReaderWriterQueue<Image> q(30);
 ReaderWriterQueue<Mat> disp_frame(1), disp_mask(1);
@@ -136,9 +136,9 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	error = cam.SetCameraParameters(imageLeft, imageTop, imageWidth, imageHeight);
 	
-	//error = cam.SetTrigger();
-	error = cam.SetProperty(FRAME_RATE, 100);
-	error = cam.SetProperty(SHUTTER, 2.300);
+	error = cam.SetTrigger();
+	//error = cam.SetProperty(FRAME_RATE, 100);
+	error = cam.SetProperty(SHUTTER, 3.002);
 	error = cam.SetProperty(GAIN, 0.0);
 	error = cam.cam.StartCapture(OnImageGrabbed);
 
@@ -148,9 +148,10 @@ int _tmain(int argc, _TCHAR* argv[])
 		return -1;
 	}
 
-	int thresh = 50;
+	int thresh = 120;
 	int erd = 0;
-	int dlt = 2;
+	int dlt = 0;
+
 	Mat element = getStructuringElement(MORPH_RECT, Size(3, 3), Point(1, 1));
 
 	#pragma omp parallel sections num_threads(3)
@@ -229,16 +230,17 @@ int _tmain(int argc, _TCHAR* argv[])
 
 		#pragma omp section
 		{
-			namedWindow("parameters", WINDOW_NORMAL);
-			createTrackbar("center x", "parameters", &center.x, imageWidth);
-			createTrackbar("center y", "parameters", &center.y, imageHeight);
-			createTrackbar("major axis", "parameters", &maj_axis, imageWidth / 2);
-			createTrackbar("minor axis", "parameters", &min_axis, imageHeight / 2);
-			createTrackbar("angle", "parameters", &angle, 180);
+			//namedWindow("parameters", WINDOW_AUTOSIZE);
+			//createTrackbar("center x", "parameters", &center.x, imageWidth);
+			//createTrackbar("center y", "parameters", &center.y, imageHeight);
+			//createTrackbar("major axis", "parameters", &maj_axis, imageWidth / 2);
+			//createTrackbar("minor axis", "parameters", &min_axis, imageHeight / 2);
+			//createTrackbar("angle", "parameters", &angle, 180);
 			
-			createTrackbar("thresh", "parameters", &thresh, 255);
-			createTrackbar("erode", "parameters", &erd, 5);
-			createTrackbar("dilate", "parameters", &dlt, 5);
+			namedWindow("control", WINDOW_AUTOSIZE);
+			createTrackbar("thresh", "control", &thresh, 255);
+			createTrackbar("erode", "control", &erd, 5);
+			createTrackbar("dilate", "control", &dlt, 5);
 
 			Mat tframe, tmask;
 
@@ -247,7 +249,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 				if (disp_frame.try_dequeue(tframe))
 				{
-					ellipse(tframe, center, Size(maj_axis, min_axis), angle, 0, 360, Scalar(255, 255, 255));
+					//ellipse(tframe, center, Size(maj_axis, min_axis), angle, 0, 360, Scalar(255, 255, 255));
 					imshow("camera", tframe);
 				}
 
@@ -269,24 +271,24 @@ int _tmain(int argc, _TCHAR* argv[])
 
 		#pragma omp section
 		{
-			int mask_key_state = 0;
+			//int mask_key_state = 0;
 			int record_key_state = 0;
 
 			while (true)
 			{
-				if (GetAsyncKeyState(VK_F1))
-				{
-					if (!mask_key_state)
-					{
-						Mat mask = Mat::zeros(Size(imageWidth, imageHeight), CV_8UC1);
-						ellipse(mask, Point(imageWidth / 2, imageHeight / 2), Size(maj_axis, min_axis), angle, 0, 360, Scalar(255, 255, 255), FILLED);
-						imwrite("mask.bmp", mask);
-					}
+				//if (GetAsyncKeyState(VK_F1))
+				//{
+				//	if (!mask_key_state)
+				//	{
+				//		Mat mask = Mat::zeros(Size(imageWidth, imageHeight), CV_8UC1);
+				//		ellipse(mask, Point(imageWidth / 2, imageHeight / 2), Size(maj_axis, min_axis), angle, 0, 360, Scalar(255, 255, 255), FILLED);
+				//		imwrite("mask.bmp", mask);
+				//	}
 
-					mask_key_state = 1;
-				}
-				else
-					mask_key_state = 0;
+				//	mask_key_state = 1;
+				//}
+				//else
+				//	mask_key_state = 0;
 
 				if (GetAsyncKeyState(VK_F2))
 				{
