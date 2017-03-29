@@ -33,8 +33,11 @@
 #define XVOLTPERDEGREE 0.55
 #define YVOLTPERDEGREE 0.525
 
-#define MIN_ANGLE -7.5
-#define MAX_ANGLE 7.5
+#define XOFFSET -0.08		// x-offset for centering galvo to target (in volts)
+#define YOFFSET -0.13		// y-offset for centering galvo to target (in volts)
+
+#define MIN_ANGLE -9.0
+#define MAX_ANGLE 9.0
 #define ANGLE_STEP_SIZE 0.1
 
 // TODO: reference additional headers your program requires here

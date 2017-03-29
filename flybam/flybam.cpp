@@ -13,11 +13,11 @@ using namespace concurrency;
 bool stream = true;
 
 bool flyview_track = false;
-bool manual_track = true;
+bool manual_track = false;
 
 bool flyview_record = false;
 bool arenaview_record = false;
-bool arenaview_mask = false;
+//bool arenaview_mask = false;
 
 struct fvwritedata
 {
@@ -133,8 +133,8 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	int fly_image_width = 240, fly_image_height = 240;
 
-	Point el_center(243, 217);
-	int el_maj_axis = 236, el_min_axis = 138;
+	Point el_center(254, 243);
+	int el_maj_axis = 236, el_min_axis = 133;
 	int el_angle = 178;
 
 	PGRcam arena_cam;
@@ -386,11 +386,11 @@ int _tmain(int argc, _TCHAR* argv[])
 					
 					threshold(arena_frame, arena_mask, arena_thresh, 255, THRESH_BINARY_INV);
 					
-					if (arenaview_mask)
-					{
+					//if (arenaview_mask)
+					//{
 						outer_mask = Mat::zeros(Size(arena_image_width, arena_image_height), CV_8UC1);
 						ellipse(outer_mask, el_center, Size(el_maj_axis, el_min_axis), el_angle, 0, 360, Scalar(255, 255, 255), FILLED);
-					}
+					//}
 
 					arena_mask &= outer_mask;
 
@@ -640,7 +640,7 @@ int _tmain(int argc, _TCHAR* argv[])
 			int record_key_state = 0;
 			int track_key_state = 0;
 			int arena_track_key_state = 0;
-			int mask_key_state = 0;
+			//int mask_key_state = 0;
 			
 			int left_key_state = 0;
 			int right_key_state = 0;
@@ -747,15 +747,15 @@ int _tmain(int argc, _TCHAR* argv[])
 				else
 					record_key_state = 0;
 
-				if (GetAsyncKeyState(VK_F3))
-				{
-					if (!mask_key_state)
-						arenaview_mask = !arenaview_mask;
+				//if (GetAsyncKeyState(VK_F3))
+				//{
+				//	if (!mask_key_state)
+				//		arenaview_mask = !arenaview_mask;
 
-					mask_key_state = 1;
-				}
-				else
-					mask_key_state = 0;
+				//	mask_key_state = 1;
+				//}
+				//else
+				//	mask_key_state = 0;
 
 				if (GetAsyncKeyState(VK_ESCAPE))
 				{

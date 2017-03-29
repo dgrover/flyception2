@@ -55,13 +55,13 @@
 #define XVOLTPERDEGREE 0.55
 #define YVOLTPERDEGREE 0.525
 
-#define XOFFSET -0.15		// x-offset for centering galvo to target (in volts)
-#define YOFFSET -0.20		// y-offset for centering galvo to target (in volts)
+#define XOFFSET -0.08		// x-offset for centering galvo to target (in volts)
+#define YOFFSET -0.13		// y-offset for centering galvo to target (in volts)
 
 #define SCALEX 0.0008
 #define SCALEY 0.0008
 
-#define NFLIES 2
+#define NFLIES 1
 #define NLOSTFRAMES 5
 
 #define MAXFVRECFRAMES 1000*100
