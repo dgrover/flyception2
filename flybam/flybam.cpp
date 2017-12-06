@@ -13,7 +13,7 @@ using namespace concurrency;
 bool stream = true;
 
 bool flyview_track = false;
-bool manual_track = false;
+bool manual_track = true;
 
 bool flyview_record = false;
 bool arenaview_record = false;
@@ -81,6 +81,22 @@ void OnImageGrabbed(Image* pImage, const void* pCallbackData)
 
 int _tmain(int argc, _TCHAR* argv[])
 {
+	// init arduino for camera lens control
+	Serial* SP = new Serial("COM4");    // adjust as needed
+
+	if (SP->IsConnected())
+		printf("Connecting lens controller arduino [OK]\n");
+
+	printf("Sending lens sync command [OK]\n");
+
+	// sending 'S' to sync lens twice
+	SP->WriteData("S", 1);
+	Sleep(1000);
+	SP->WriteData("S", 1);
+	Sleep(1000);
+
+	// initialize camera link gazelle camera
+
 	SapAcquisition	*Acq	 = NULL;
 	SapBuffer		*Buffers = NULL;
 	SapView			*View	 = NULL;
@@ -133,7 +149,8 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	int fly_image_width = 240, fly_image_height = 240;
 
-	Point el_center(254, 243);
+	//Point el_center(254, 236);
+	Point el_center(233, 223);
 	int el_maj_axis = 236, el_min_axis = 133;
 	int el_angle = 178;
 
@@ -208,14 +225,17 @@ int _tmain(int argc, _TCHAR* argv[])
 	Mat outer_mask = Mat::zeros(Size(arena_image_width, arena_image_height), CV_8UC1);
 	ellipse(outer_mask, el_center, Size(el_maj_axis, el_min_axis), el_angle, 0, 360, Scalar(255, 255, 255), FILLED);
 
-	Mat arena_img, arena_frame, arena_mask;
+	Mat arena_img, arena_frame, arena_mask, arena_bg;
 	Mat fly_img, fly_frame, fly_fg, fly_mask;
 
-	int arena_thresh = 85;
-	int fly_thresh = 50;
+	Mat arena_mean = Mat::zeros(arena_image_width, arena_image_height, CV_32F);
+
+	//int arena_thresh = 85;
+	int arena_thresh = 75;
+	int fly_thresh = 150;
 
 	int fly_erode = 0;
-	int fly_dilate = 2;
+	int fly_dilate = 3;
 
 	int arena_erode = 1;
 	int arena_dilate = 2;
@@ -230,7 +250,11 @@ int _tmain(int argc, _TCHAR* argv[])
 	int avrcount = 0;
 
 	int lost = 0;
-	
+
+	vector<Point2f> bpt(NBEADS);
+	float d_01, d_02, d_12;
+	bool three_point_tracking = false;
+
 	//Press [F1] to start/stop tracking, [F2] to start/stop recording, [ESC] to exit.
 	#pragma omp parallel sections num_threads(7)
 	{
@@ -264,7 +288,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 						erode(fly_fg, fly_mask, fly_element, Point(-1, -1), fly_erode);
 						dilate(fly_mask, fly_mask, fly_element, Point(-1, -1), fly_dilate);
-						
+
 						if (flyview_track)
 						{
 							float total_x = 0;
@@ -280,9 +304,11 @@ int _tmain(int argc, _TCHAR* argv[])
 								vector<Moments> fly_mu(fly_contours.size());
 								vector<Point2f> fly_mc(fly_contours.size());
 
+								vector<Point2f> bead_ctr_pts;
+								vector<Point2f> bead_pt(NBEADS);
+
 								for (int i = 0; i < fly_contours.size(); i++)
 								{
-									//drawContours(fly_mask, fly_contours, i, Scalar(255, 255, 255), FILLED, 1);
 									fly_mu[i] = moments(fly_contours[i], false);
 									fly_mc[i] = Point2f(fly_mu[i].m10 / fly_mu[i].m00, fly_mu[i].m01 / fly_mu[i].m00);
 
@@ -291,12 +317,173 @@ int _tmain(int argc, _TCHAR* argv[])
 									if (csize > MIN_MARKER_SIZE && csize < MAX_MARKER_SIZE)
 									{
 										drawContours(fly_mask, fly_contours, i, Scalar(255, 255, 255), FILLED, 1);
+										bead_ctr_pts.push_back(fly_mc[i]);
+									}
+								}
 
-										total_x += fly_mc[i].x;
-										total_y += fly_mc[i].y;
+								if (bead_ctr_pts.size() >= NBEADS)
+								{
+									for (int i = 0; i < NBEADS; i++)
+									{
+										int j = findClosestPoint(pt[i], bead_ctr_pts);
+
+										bead_pt[i] = bead_ctr_pts[j];
+										//pt[i] = bead_ctr_pts[j];
+
+										putText(fly_frame, to_string(i), bead_pt[i], FONT_HERSHEY_COMPLEX, 0.4, Scalar(0, 0, 0));
+
+										bead_ctr_pts.erase(bead_ctr_pts.begin() + j);
+									}
+
+									d_01 = dist(bead_pt[0], bead_pt[1]);
+									d_02 = dist(bead_pt[0], bead_pt[2]);
+									d_12 = dist(bead_pt[1], bead_pt[2]);
+
+									three_point_tracking = true;
+
+								}
+								else if (bead_ctr_pts.size() < NBEADS)
+								{
+									vector<Point2f> last_bead_pt = bpt;
+									vector<int> bead_pt_ind;
+
+									for (int i = 0; i < NBEADS; i++)
+										bead_pt_ind.push_back(i);
+
+									for (int i = 0; i < bead_ctr_pts.size(); i++)
+									{
+										int j = findClosestPoint(bead_ctr_pts[i], last_bead_pt);
+
+										bead_pt[bead_pt_ind[j]] = bead_ctr_pts[i];
+										//pt[bead_pt_ind[j]] = bead_ctr_pts[i];
+
+										putText(fly_frame, to_string(bead_pt_ind[j]), bead_pt[bead_pt_ind[j]], FONT_HERSHEY_COMPLEX, 0.4, Scalar(0, 0, 0));
+
+										last_bead_pt.erase(last_bead_pt.begin() + j);
+										bead_pt_ind.erase(bead_pt_ind.begin() + j);
+									}
+
+									if (three_point_tracking && bead_ctr_pts.size() == (NBEADS - 1))
+									{
+										if (bead_pt[0].x == 0 && bead_pt[0].y == 0)
+										{
+											float theta = atan2(bead_pt[2].y - bead_pt[1].y, bead_pt[2].x - bead_pt[1].x);
+
+											float x_pp = (pow(d_12, 2) + pow(d_01, 2) - pow(d_02, 2)) / (2 * d_12);
+
+											float y_pp_p = sqrt((d_12 + d_01 + d_02) * (d_12 + d_01 - d_02) * (d_12 - d_01 + d_02) * (-d_12 + d_01 + d_02)) / (2 * d_12);
+											float y_pp_n = -sqrt((d_12 + d_01 + d_02) * (d_12 + d_01 - d_02) * (d_12 - d_01 + d_02) * (-d_12 + d_01 + d_02)) / (2 * d_12);
+
+											float x_p_p = cos(theta)*x_pp - sin(theta)*y_pp_p;
+											float y_p_p = sin(theta)*x_pp + cos(theta)*y_pp_p;
+
+											float x_p_n = cos(theta)*x_pp - sin(theta)*y_pp_n;
+											float y_p_n = sin(theta)*x_pp + cos(theta)*y_pp_n;
+
+											float x_p = x_p_p + bead_pt[1].x;
+											float y_p = y_p_p + bead_pt[1].y;
+
+											float x_n = x_p_n + bead_pt[1].x;
+											float y_n = y_p_n + bead_pt[1].y;
+
+											if (dist(bpt[0], Point2f(x_p, y_p)) < dist(bpt[0], Point2f(x_n, y_n)))
+											{
+												bead_pt[0] = Point2f(x_p, y_p);
+												drawMarker(fly_frame, Point2f(x_p, y_p), Scalar(0, 0, 0), MARKER_TILTED_CROSS, 5, 1);
+											}
+											else
+											{
+												bead_pt[0] = Point2f(x_n, y_n);
+												drawMarker(fly_frame, Point2f(x_n, y_n), Scalar(0, 0, 0), MARKER_TILTED_CROSS, 5, 1);
+											}
+										}
+
+
+										if (bead_pt[1].x == 0 && bead_pt[1].y == 0)
+										{
+											float theta = atan2(bead_pt[2].y - bead_pt[0].y, bead_pt[2].x - bead_pt[0].x);
+
+											float x_pp = (pow(d_02, 2) + pow(d_01, 2) - pow(d_12, 2)) / (2 * d_02);
+
+											float y_pp_p = sqrt((d_02 + d_01 + d_12) * (d_02 + d_01 - d_12) * (d_02 - d_01 + d_12) * (-d_02 + d_01 + d_12)) / (2 * d_02);
+											float y_pp_n = -sqrt((d_02 + d_01 + d_12) * (d_02 + d_01 - d_12) * (d_02 - d_01 + d_12) * (-d_02 + d_01 + d_12)) / (2 * d_02);
+
+											float x_p_p = cos(theta)*x_pp - sin(theta)*y_pp_p;
+											float y_p_p = sin(theta)*x_pp + cos(theta)*y_pp_p;
+
+											float x_p_n = cos(theta)*x_pp - sin(theta)*y_pp_n;
+											float y_p_n = sin(theta)*x_pp + cos(theta)*y_pp_n;
+
+											float x_p = x_p_p + bead_pt[0].x;
+											float y_p = y_p_p + bead_pt[0].y;
+
+											float x_n = x_p_n + bead_pt[0].x;
+											float y_n = y_p_n + bead_pt[0].y;
+
+											if (dist(bpt[1], Point2f(x_p, y_p)) < dist(bpt[1], Point2f(x_n, y_n)))
+											{
+												bead_pt[1] = Point2f(x_p, y_p);
+												drawMarker(fly_frame, Point2f(x_p, y_p), Scalar(0, 0, 0), MARKER_TILTED_CROSS, 5, 1);
+											}
+											else
+											{
+												bead_pt[1] = Point2f(x_n, y_n);
+												drawMarker(fly_frame, Point2f(x_n, y_n), Scalar(0, 0, 0), MARKER_TILTED_CROSS, 5, 1);
+											}
+										}
+
+
+										if (bead_pt[2].x == 0 && bead_pt[2].y == 0)
+										{
+											float theta = atan2(bead_pt[1].y - bead_pt[0].y, bead_pt[1].x - bead_pt[0].x);
+
+											float x_pp = (pow(d_01, 2) + pow(d_02, 2) - pow(d_12, 2)) / (2 * d_01);
+
+											float y_pp_p = sqrt((d_01 + d_02 + d_12) * (d_01 + d_02 - d_12) * (d_01 - d_02 + d_12) * (-d_01 + d_02 + d_12)) / (2 * d_01);
+											float y_pp_n = -sqrt((d_01 + d_02 + d_12) * (d_01 + d_02 - d_12) * (d_01 - d_02 + d_12) * (-d_01 + d_02 + d_12)) / (2 * d_01);
+
+											float x_p_p = cos(theta)*x_pp - sin(theta)*y_pp_p;
+											float y_p_p = sin(theta)*x_pp + cos(theta)*y_pp_p;
+
+											float x_p_n = cos(theta)*x_pp - sin(theta)*y_pp_n;
+											float y_p_n = sin(theta)*x_pp + cos(theta)*y_pp_n;
+
+											float x_p = x_p_p + bead_pt[0].x;
+											float y_p = y_p_p + bead_pt[0].y;
+
+											float x_n = x_p_n + bead_pt[0].x;
+											float y_n = y_p_n + bead_pt[0].y;
+
+											if (dist(bpt[2], Point2f(x_p, y_p)) < dist(bpt[2], Point2f(x_n, y_n)))
+											{
+												bead_pt[2] = Point2f(x_p, y_p);
+												drawMarker(fly_frame, Point2f(x_p, y_p), Scalar(0, 0, 0), MARKER_TILTED_CROSS, 5, 1);
+											}
+											else
+											{
+												bead_pt[2] = Point2f(x_n, y_n);
+												drawMarker(fly_frame, Point2f(x_n, y_n), Scalar(0, 0, 0), MARKER_TILTED_CROSS, 5, 1);
+											}
+										}
+
+										three_point_tracking = true;
+									}
+									else
+										three_point_tracking = false;
+								}
+
+								for (int i = 0; i < NBEADS; i++)
+								{
+									if (bead_pt[i].x != 0 && bead_pt[i].y != 0)
+									{
+										total_x += bead_pt[i].x;
+										total_y += bead_pt[i].y;
 										contour_count++;
 									}
 								}
+
+								bpt = bead_pt;
+
 							}
 
 							if (contour_count > 0)
@@ -311,7 +498,9 @@ int _tmain(int argc, _TCHAR* argv[])
 								//drawContours(fly_mask, fly_contours, j, Scalar(255, 255, 255), FILLED, 1);
 								//drawContours(fly_frame, hull, j, Scalar::all(255), 1, 8, vector<Vec4i>(), 0, Point());
 
-								circle(fly_frame, pt2d, 1, Scalar(0, 0, 0), FILLED, 1);
+								//circle(fly_frame, pt2d, 1, Scalar(255, 255, 255), FILLED, 1);
+								drawMarker(fly_frame, pt2d, Scalar(255, 255, 255), MARKER_TILTED_CROSS, 5, 1);
+
 								Point2f rotpt = rotateFlyCenter(pt2d, fly_image_width, fly_image_height);
 
 								float diffx = rotpt.x - (fly_image_width / 2);
@@ -331,6 +520,7 @@ int _tmain(int argc, _TCHAR* argv[])
 								{
 									flyview_track = false;
 									manual_track = false;
+									three_point_tracking = false;
 									ndq.reset();
 								}
 							}
@@ -338,6 +528,9 @@ int _tmain(int argc, _TCHAR* argv[])
 
 						putText(fly_frame, to_string((int)fly_fps), Point((fly_image_width - 50), 10), FONT_HERSHEY_COMPLEX, 0.4, Scalar(255, 255, 255));
 						putText(fly_frame, to_string(q.unsafe_size()), Point((fly_image_width - 50), 20), FONT_HERSHEY_COMPLEX, 0.4, Scalar(255, 255, 255));
+
+						if (manual_track)
+							drawMarker(fly_frame, Point2f(fly_image_width/2, fly_image_height/2), Scalar(255, 255, 255), MARKER_CROSS, 20, 1);
 
 						if (flyview_record)
 							putText(fly_frame, to_string(fvrcount), Point(0, 10), FONT_HERSHEY_COMPLEX, 0.4, Scalar(255, 255, 255));
@@ -371,6 +564,12 @@ int _tmain(int argc, _TCHAR* argv[])
 			
 			//int arena_last_radius = arena_radius;
 
+			bool comp_bg = true;
+
+			int count_frames = 0;
+			int count_bg = 0;
+			
+
 			while (true)
 			{
 				if (aq.try_pop(img))
@@ -384,14 +583,39 @@ int _tmain(int argc, _TCHAR* argv[])
 					arena_img = tframe.clone();
 					arena_frame = tframe.clone();
 					
-					threshold(arena_frame, arena_mask, arena_thresh, 255, THRESH_BINARY_INV);
-					
-					//if (arenaview_mask)
+					//accumulateWeighted(arena_frame, arena_mean, 0.05);
+					//arena_mean.convertTo(arena_bg, CV_8UC1);
+
+					//if (comp_init_bg)
 					//{
-						outer_mask = Mat::zeros(Size(arena_image_width, arena_image_height), CV_8UC1);
-						ellipse(outer_mask, el_center, Size(el_maj_axis, el_min_axis), el_angle, 0, 360, Scalar(255, 255, 255), FILLED);
+					//	arena_bg = tframe.clone();
+					//	accumulate(arena_frame, arena_mean);
+					//	count_bg++;
+					//	comp_init_bg = false;
 					//}
 
+					if (count_frames++ == 5000)
+						comp_bg = true;
+
+					if (comp_bg)
+					{
+						count_bg++;
+						
+						accumulate(arena_frame, arena_mean);
+						arena_bg = arena_mean / count_bg;
+						arena_bg.convertTo(arena_bg, CV_8UC1);
+						
+						count_frames = 0;
+						comp_bg = false;
+					}
+
+					subtract(arena_bg, arena_frame, arena_mask);
+					threshold(arena_mask, arena_mask, arena_thresh, 255, THRESH_BINARY);
+
+					//threshold(arena_frame, arena_mask, arena_thresh, 255, THRESH_BINARY_INV);
+					
+					outer_mask = Mat::zeros(Size(arena_image_width, arena_image_height), CV_8UC1);
+					ellipse(outer_mask, el_center, Size(el_maj_axis, el_min_axis), el_angle, 0, 360, Scalar(255, 255, 255), FILLED);
 					arena_mask &= outer_mask;
 
 					//morphologyEx(arena_mask, arena_mask, MORPH_OPEN, arena_element);
@@ -418,7 +642,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 							double csize = contourArea(arena_contours[i]);
 
-							if (csize > 5 && csize < 500)
+							if (csize > 10)
 							{
 								//drawContours(arena_frame, arena_contours, i, Scalar(255, 255, 255), 1, 8, vector<Vec4i>(), 0, Point());
 								drawContours(arena_mask, arena_contours, i, Scalar(255, 255, 255), FILLED, 1);
@@ -478,6 +702,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 					arenaDispStream.try_enqueue(arena_frame.clone());
 					arenaMaskStream.try_enqueue(arena_mask.clone());
+					//arenaMaskStream.try_enqueue(arena_bg.clone());
 
 					if (arenaview_record)
 					{
@@ -572,8 +797,8 @@ int _tmain(int argc, _TCHAR* argv[])
 			createTrackbar("arena thresh", "controls", &arena_thresh, 255);
 			createTrackbar("fly thresh", "controls", &fly_thresh, 255);
 			
-			if (NFLIES > 1)
-				createTrackbar("focal fly", "controls", &focal_fly, NFLIES-1);
+			//if (NFLIES > 1)
+			//	createTrackbar("focal fly", "controls", &focal_fly, NFLIES-1);
 			
 			createTrackbar("fly erode", "controls", &fly_erode, 5);
 			createTrackbar("fly dilate", "controls", &fly_dilate, 5);
@@ -605,6 +830,7 @@ int _tmain(int argc, _TCHAR* argv[])
 				if (!stream)
 				{
 					destroyWindow("controls");
+					destroyWindow("parameters");
 					destroyWindow("arena image");
 					destroyWindow("arena mask");
 					break;
@@ -639,83 +865,208 @@ int _tmain(int argc, _TCHAR* argv[])
 		{
 			int record_key_state = 0;
 			int track_key_state = 0;
-			int arena_track_key_state = 0;
+			//int arena_track_key_state = 0;
 			//int mask_key_state = 0;
 			
-			int left_key_state = 0;
-			int right_key_state = 0;
-			int up_key_state = 0;
-			int down_key_state = 0;
+			//int left_key_state = 0;
+			//int right_key_state = 0;
+			//int up_key_state = 0;
+			//int down_key_state = 0;
+
+			int fly_key_state = 0;
+
+			//int min_inc_foc_state = 0;
+			//int min_dec_foc_state = 0;
+
+			int inc_foc_state = 0;
+			int dec_foc_state = 0;
+
+			int max_foc_state = 0;
+			int min_foc_state = 0;
+			
+			int reset_galvo_state = 0;
 
 			while (true)
 			{
-				if (GetAsyncKeyState(VK_HOME))
+				if (GetAsyncKeyState(VK_NUMPAD1))
 				{
-					if (!arena_track_key_state)
-						manual_track = !manual_track;
-
-					arena_track_key_state = 1;
+					if (!inc_foc_state)
+						SP->WriteData("1", 1);
+					inc_foc_state = 1;
 				}
 				else
-					arena_track_key_state = 0;
+					inc_foc_state = 0;
 
-
-				if (GetAsyncKeyState(VK_LEFT))
+				if (GetAsyncKeyState(VK_NUMPAD2))
 				{
-					if (!left_key_state)
-					{
-						manual_track = true;
-						ndq.MoveLeft();
-						ndq.write();
-					}
-
-					left_key_state = 1;
+					if (!dec_foc_state)
+						SP->WriteData("!", 1);
+					dec_foc_state = 1;
 				}
 				else
-					left_key_state = 0;
+					dec_foc_state = 0;
 
-				if (GetAsyncKeyState(VK_RIGHT))
+				if (GetAsyncKeyState(VK_NUMPAD4))
 				{
-					if (!right_key_state)
-					{
-						manual_track = true;
-						ndq.MoveRight();
-						ndq.write();
-					}
-
-					right_key_state = 1;
+					if (!max_foc_state)
+						SP->WriteData("5", 1);
+					max_foc_state = 1;
 				}
 				else
-					right_key_state = 0;
+					max_foc_state = 0;
 
-				if (GetAsyncKeyState(VK_UP))
+				if (GetAsyncKeyState(VK_NUMPAD5))
 				{
-					if (!up_key_state)
-					{
-						manual_track = true;
-						ndq.MoveUp();
-						ndq.write();
-					}
-
-					up_key_state = 1;
+					if (!min_foc_state)
+						SP->WriteData("6", 1);
+					min_foc_state = 1;
 				}
 				else
-					up_key_state = 0;
+					min_foc_state = 0;
 
-				if (GetAsyncKeyState(VK_DOWN))
-				{
-					if (!down_key_state)
-					{
-						manual_track = true;
-						ndq.MoveDown();
-						ndq.write();
-					}
+				//if (GetAsyncKeyState(VK_NUMPAD7))
+				//{
+				//	if (!min_inc_foc_state)
+				//		SP->WriteData("0", 1);
+				//	min_inc_foc_state = 1;
+				//}
+				//else
+				//	min_inc_foc_state = 0;
 
-					down_key_state = 1;
-				}
-				else
-					down_key_state = 0;
+				//if (GetAsyncKeyState(VK_NUMPAD8))
+				//{
+				//	if (!min_dec_foc_state)
+				//		SP->WriteData(")", 1);
+				//	min_dec_foc_state = 1;
+				//}
+				//else
+				//	min_dec_foc_state = 0;
 								
+				//if (GetAsyncKeyState(VK_HOME))
+				//{
+				//	if (!arena_track_key_state)
+				//	{
+				//		manual_track = false;
+				//		flyview_track = false;
+				//	}
+
+				//	arena_track_key_state = 1;
+				//}
+				//else
+				//	arena_track_key_state = 0;
+
+				if (GetAsyncKeyState(VK_TAB))
+				{
+					if (!fly_key_state)
+					{
+						int tfocal = focal_fly + 1;
+
+						if (tfocal == NFLIES)
+							focal_fly = 0;
+						else
+							focal_fly = tfocal;
+
+						manual_track = false;
+						flyview_track = false;
+					}
+
+					fly_key_state = 1;
+				}
+				else
+					fly_key_state = 0;
+
+
+				//if (GetAsyncKeyState(VK_LEFT))
+				//{
+				//	if (!left_key_state)
+				//	{
+				//		manual_track = true;
+				//		ndq.MoveLeft();
+				//		ndq.write();
+				//	}
+
+				//	left_key_state = 1;
+				//}
+				//else
+				//	left_key_state = 0;
+
+				SHORT leftKeyState = GetAsyncKeyState(VK_LEFT);
+
+				if ((1 << 15) & leftKeyState)
+				{
+					manual_track = true;
+					ndq.MoveLeft();
+					ndq.write();
+				}
+
+				//if (GetAsyncKeyState(VK_RIGHT))
+				//{
+				//	if (!right_key_state)
+				//	{
+				//		manual_track = true;
+				//		ndq.MoveRight();
+				//		ndq.write();
+				//	}
+
+				//	right_key_state = 1;
+				//}
+				//else
+				//	right_key_state = 0;
+
+				SHORT rightKeyState = GetAsyncKeyState(VK_RIGHT);
+
+				if ((1 << 15) & rightKeyState)
+				{
+					manual_track = true;
+					ndq.MoveRight();
+					ndq.write();
+				}
+
+				//if (GetAsyncKeyState(VK_UP))
+				//{
+				//	if (!up_key_state)
+				//	{
+				//		manual_track = true;
+				//		ndq.MoveUp();
+				//		ndq.write();
+				//	}
+
+				//	up_key_state = 1;
+				//}
+				//else
+				//	up_key_state = 0;
+
+				SHORT upKeyState = GetAsyncKeyState(VK_UP);
+
+				if ((1 << 15) & upKeyState)
+				{
+					manual_track = true;
+					ndq.MoveUp();
+					ndq.write();
+				}
+
+				//if (GetAsyncKeyState(VK_DOWN))
+				//{
+				//	if (!down_key_state)
+				//	{
+				//		manual_track = true;
+				//		ndq.MoveDown();
+				//		ndq.write();
+				//	}
+
+				//	down_key_state = 1;
+				//}
+				//else
+				//	down_key_state = 0;
+					
+				SHORT downKeyState = GetAsyncKeyState(VK_DOWN);
+
+				if ((1 << 15) & downKeyState)
+				{
+					manual_track = true;
+					ndq.MoveDown();
+					ndq.write();
+				}
 
 				if (GetAsyncKeyState(VK_F1))
 				{
@@ -780,6 +1131,20 @@ int _tmain(int argc, _TCHAR* argv[])
 						arenaview_record = false;
 					}
 				}
+
+				if (GetAsyncKeyState(VK_HOME))
+				{
+					if (!reset_galvo_state)
+					{
+						manual_track = true;
+						ndq.reset();
+						ndq.write();
+					}
+
+					reset_galvo_state = 1;
+				}
+				else
+					reset_galvo_state = 0;
 			}
 		}
 	}
@@ -820,7 +1185,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	
 	printf("\n\nCentering galvo ");
 	
-	ndq.SetGalvoAngles(Point2f(0, 0));
+	ndq.reset();
 	ndq.write();
 	
 	printf("[OK]\n");

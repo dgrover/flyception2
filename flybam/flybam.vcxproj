@@ -146,6 +146,7 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="arduino.h" />
     <ClInclude Include="avfmfwriter.h" />
     <ClInclude Include="daq.h" />
     <ClInclude Include="ExampleUtils.h" />
@@ -156,6 +157,7 @@
     <ClInclude Include="utility.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="arduino.cpp" />
     <ClCompile Include="avfmfwriter.cpp" />
     <ClCompile Include="daq.cpp" />
     <ClCompile Include="ExampleUtils.cpp" />
