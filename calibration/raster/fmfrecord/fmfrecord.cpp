@@ -148,7 +148,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		return -1;
 	}
 
-	int thresh = 120;
+	int thresh = 100;
 	int erd = 0;
 	int dlt = 0;
 

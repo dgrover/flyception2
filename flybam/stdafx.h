@@ -47,7 +47,7 @@
 #define GALVO_Y_HEIGHT 68.167			//in mm
 #define GALVO_XY_DIST 15.174			//in mm
 #define GALVO_X_MIRROR_ANGLE 15			//in degrees
-#define GALVO_STEP_SIZE 0.0000025
+#define GALVO_STEP_SIZE 0.0000075		// doubled the step size to maintain similar manual speed control (due to spectre/meltdown processor slowdown)
 
 //#define ARENA_X_RADIUS 22.159				//in mm
 //#define ARENA_Y_RADIUS 20				//in mm
@@ -62,7 +62,7 @@
 //#define YOFFSET -0.13		// y-offset for centering galvo to target (in volts)
 
 #define XOFFSET -0.25		// x-offset for centering galvo to target (in volts)
-#define YOFFSET -0.65		// y-offset for centering galvo to target (in volts)
+#define YOFFSET -0.315		// y-offset for centering galvo to target (in volts)
 
 #define SCALEX 0.0008
 #define SCALEY 0.0008
@@ -72,6 +72,7 @@
 
 #define MAXFVRECFRAMES 1000*100
 #define MAXAVRECFRAMES 50*100
+#define FLASHFRAMES 5
 
 #define MIN_MARKER_SIZE 10
 #define MAX_MARKER_SIZE 500

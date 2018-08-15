@@ -13,11 +13,12 @@ using namespace concurrency;
 bool stream = true;
 
 bool flyview_track = false;
-bool manual_track = true;
+bool manual_track = false;
 
 bool flyview_record = false;
 bool arenaview_record = false;
 //bool arenaview_mask = false;
+bool flashPressed = false;
 
 struct fvwritedata
 {
@@ -149,9 +150,8 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	int fly_image_width = 240, fly_image_height = 240;
 
-	//Point el_center(254, 236);
-	Point el_center(233, 223);
-	int el_maj_axis = 236, el_min_axis = 133;
+	Point el_center(260, 227);
+	int el_maj_axis = 237, el_min_axis = 133;
 	int el_angle = 178;
 
 	PGRcam arena_cam;
@@ -221,6 +221,8 @@ int _tmain(int argc, _TCHAR* argv[])
 	ndq.start();
 	ndq.write();
 
+	ndq.startTrigger();
+
 	//create arena mask
 	Mat outer_mask = Mat::zeros(Size(arena_image_width, arena_image_height), CV_8UC1);
 	ellipse(outer_mask, el_center, Size(el_maj_axis, el_min_axis), el_angle, 0, 360, Scalar(255, 255, 255), FILLED);
@@ -230,8 +232,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	Mat arena_mean = Mat::zeros(arena_image_width, arena_image_height, CV_32F);
 
-	//int arena_thresh = 85;
-	int arena_thresh = 75;
+	int arena_thresh = 65;
 	int fly_thresh = 150;
 
 	int fly_erode = 0;
@@ -241,6 +242,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	int arena_dilate = 2;
 
 	int focal_fly = 0;
+	bool comp_bg = true;
 
 	//Mat fly_element = getStructuringElement(MORPH_RECT, Size(9, 9), Point(4, 4));
 	Mat fly_element = getStructuringElement(MORPH_RECT, Size(3, 3), Point(1, 1));
@@ -248,6 +250,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	int fvrcount = 0;
 	int avrcount = 0;
+	int flashcount = 0;
 
 	int lost = 0;
 
@@ -549,6 +552,9 @@ int _tmain(int argc, _TCHAR* argv[])
 							fvwdata.push(fvin);
 							fvrcount++;
 						}
+
+						if (flashPressed)
+							flashcount++;
 					}
 				}
 
@@ -564,10 +570,8 @@ int _tmain(int argc, _TCHAR* argv[])
 			
 			//int arena_last_radius = arena_radius;
 
-			bool comp_bg = true;
-
-			int count_frames = 0;
-			int count_bg = 0;
+			//int count_frames = 0;
+			//int count_bg = 0;
 			
 
 			while (true)
@@ -594,18 +598,20 @@ int _tmain(int argc, _TCHAR* argv[])
 					//	comp_init_bg = false;
 					//}
 
-					if (count_frames++ == 5000)
-						comp_bg = true;
+					//if (count_frames++ == 50000)
+					//	comp_bg = true;
 
 					if (comp_bg)
 					{
-						count_bg++;
+						//count_bg++;
 						
-						accumulate(arena_frame, arena_mean);
-						arena_bg = arena_mean / count_bg;
-						arena_bg.convertTo(arena_bg, CV_8UC1);
+						//accumulate(arena_frame, arena_mean);
+						//arena_bg = arena_mean / count_bg;
+						//arena_bg.convertTo(arena_bg, CV_8UC1);
+
+						arena_bg = tframe.clone();
 						
-						count_frames = 0;
+						//count_frames = 0;
 						comp_bg = false;
 					}
 
@@ -866,7 +872,10 @@ int _tmain(int argc, _TCHAR* argv[])
 			int record_key_state = 0;
 			int track_key_state = 0;
 			//int arena_track_key_state = 0;
-			//int mask_key_state = 0;
+
+			int flash_key_state = 0;
+			
+			int bg_key_state = 0;
 			
 			//int left_key_state = 0;
 			//int right_key_state = 0;
@@ -1098,15 +1107,15 @@ int _tmain(int argc, _TCHAR* argv[])
 				else
 					record_key_state = 0;
 
-				//if (GetAsyncKeyState(VK_F3))
-				//{
-				//	if (!mask_key_state)
-				//		arenaview_mask = !arenaview_mask;
+				if (GetAsyncKeyState(VK_F3))
+				{
+					if (!bg_key_state)
+						comp_bg = true;
 
-				//	mask_key_state = 1;
-				//}
-				//else
-				//	mask_key_state = 0;
+					bg_key_state = 1;
+				}
+				else
+					bg_key_state = 0;
 
 				if (GetAsyncKeyState(VK_ESCAPE))
 				{
@@ -1132,6 +1141,17 @@ int _tmain(int argc, _TCHAR* argv[])
 					}
 				}
 
+				if (flashPressed)
+				{
+					if (flashcount == FLASHFRAMES)
+					{
+						flashPressed = false;
+						flashcount = 0;
+
+						ndq.flashLow();
+					}
+				}
+
 				if (GetAsyncKeyState(VK_HOME))
 				{
 					if (!reset_galvo_state)
@@ -1145,6 +1165,19 @@ int _tmain(int argc, _TCHAR* argv[])
 				}
 				else
 					reset_galvo_state = 0;
+
+				if (GetAsyncKeyState(VK_F4))
+				{
+					if (!flash_key_state)
+					{
+						ndq.flashHigh();
+						flashPressed = true;
+					}
+
+					flash_key_state = 1;
+				}
+				else
+					flash_key_state = 0;
 			}
 		}
 	}
@@ -1187,7 +1220,8 @@ int _tmain(int argc, _TCHAR* argv[])
 	
 	ndq.reset();
 	ndq.write();
-	
+	ndq.stopTrigger();
+
 	printf("[OK]\n");
 
 	return 0;

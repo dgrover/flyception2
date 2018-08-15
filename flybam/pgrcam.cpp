@@ -86,6 +86,11 @@ FlyCapture2::Error PGRcam::SetTrigger()
 
 	error = cam.SetTriggerMode(&triggerMode);
 
+	// Set image timestamp ON
+	error = cam.GetEmbeddedImageInfo(&imageInfo);
+	imageInfo.timestamp.onOff = true;
+	error = cam.SetEmbeddedImageInfo(&imageInfo);
+
 	return error;
 }
 

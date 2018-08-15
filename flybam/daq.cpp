@@ -5,12 +5,17 @@ Daq::Daq()
 {
 	taskHandleX = 0;
 	taskHandleY = 0;
+	taskHandleDig = 0;
 
 	thetax = 0.0;
 	thetay = 0.0;
 
 	dataX[0] = 0.0;
 	dataY[0] = 0.0;
+
+	for (int i = 0; i < 8; i++)
+		dataDig[i] = 0;
+
 }
 
 void Daq::configure()
@@ -18,8 +23,12 @@ void Daq::configure()
 	// DAQmx Configure Code
 	DAQmxCreateTask("", &taskHandleX);
 	DAQmxCreateTask("", &taskHandleY);
+	DAQmxCreateTask("", &taskHandleDig);
+
 	DAQmxCreateAOVoltageChan(taskHandleX, "Dev1/ao0", "", -10.0, 10.0, DAQmx_Val_Volts, "");
 	DAQmxCreateAOVoltageChan(taskHandleY, "Dev1/ao1", "", -10.0, 10.0, DAQmx_Val_Volts, "");
+	DAQmxCreateDOChan(taskHandleDig, "Dev1/port0/line0:7", "", DAQmx_Val_ChanForAllLines);
+
 }
 
 void Daq::start()
@@ -27,6 +36,37 @@ void Daq::start()
 	// DAQmx Start Code
 	DAQmxStartTask(taskHandleX);
 	DAQmxStartTask(taskHandleY);
+	DAQmxStartTask(taskHandleDig);
+}
+
+void Daq::startTrigger()
+{
+	// Enable Triggers
+	dataDig[0] = 1;
+	DAQmxWriteDigitalLines(taskHandleDig, 1, 1, 10.0, DAQmx_Val_GroupByChannel, dataDig, NULL, NULL);
+
+
+}
+
+void Daq::stopTrigger()
+{
+	// Disable Triggers
+	dataDig[0] = 0;
+	DAQmxWriteDigitalLines(taskHandleDig, 1, 1, 10.0, DAQmx_Val_GroupByChannel, dataDig, NULL, NULL);
+}
+
+void Daq::flashHigh()
+{
+
+	//Trigger Flash
+	dataDig[1] = 1;
+	DAQmxWriteDigitalLines(taskHandleDig, 1, 1, 10.0, DAQmx_Val_GroupByChannel, dataDig, NULL, NULL);
+}
+
+void Daq::flashLow()
+{
+	dataDig[1] = 0;
+	DAQmxWriteDigitalLines(taskHandleDig, 1, 1, 10.0, DAQmx_Val_GroupByChannel, dataDig, NULL, NULL);
 }
 
 void Daq::write()

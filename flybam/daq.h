@@ -12,18 +12,24 @@ class Daq
 private:
 	TaskHandle	taskHandleX;
 	TaskHandle	taskHandleY;
+	TaskHandle  taskHandleDig;
 
 	float thetax, thetay;
 
 	float64     dataX[STEP_SIZE];
 	float64     dataY[STEP_SIZE];
+	uInt8       dataDig[8];
 
 public:
 	Daq();
 	void reset();
 	void configure();
 	void start();
+	void startTrigger();
+	void stopTrigger();
 	void write();
+	void flashHigh();
+	void flashLow();
 	void ConvertPtToDeg(Point2f pt);
 	void ConvertPixelToDeg(float x, float y);
 	Point2f ConvertDegToPt();

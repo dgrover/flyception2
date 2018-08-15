@@ -30,6 +30,8 @@ private:
 	TriggerModeInfo triggerModeInfo;
 	TriggerMode triggerMode;
 
+	EmbeddedImageInfo imageInfo;
+
 	bool valid;
 
 
