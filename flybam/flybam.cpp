@@ -1003,6 +1003,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 				if ((1 << 15) & leftKeyState)
 				{
+					flyview_track = false;
 					manual_track = true;
 					ndq.MoveLeft();
 					ndq.write();
@@ -1026,6 +1027,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 				if ((1 << 15) & rightKeyState)
 				{
+					flyview_track = false;
 					manual_track = true;
 					ndq.MoveRight();
 					ndq.write();
@@ -1049,6 +1051,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 				if ((1 << 15) & upKeyState)
 				{
+					flyview_track = false;
 					manual_track = true;
 					ndq.MoveUp();
 					ndq.write();
@@ -1072,6 +1075,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 				if ((1 << 15) & downKeyState)
 				{
+					flyview_track = false;
 					manual_track = true;
 					ndq.MoveDown();
 					ndq.write();
@@ -1156,6 +1160,7 @@ int _tmain(int argc, _TCHAR* argv[])
 				{
 					if (!reset_galvo_state)
 					{
+						flyview_track = false;
 						manual_track = true;
 						ndq.reset();
 						ndq.write();

@@ -49,7 +49,7 @@
 #define GALVO_X_MIRROR_ANGLE 15			//in degrees
 #define GALVO_STEP_SIZE 0.0000075		// doubled the step size to maintain similar manual speed control (due to spectre/meltdown processor slowdown)
 
-//#define ARENA_X_RADIUS 22.159				//in mm
+//#define ARENA_X_RADIUS 22.159			//in mm
 //#define ARENA_Y_RADIUS 20				//in mm
 
 //#define TAIL_LENGTH 100
@@ -57,9 +57,6 @@
 #define XVOLTPERDEGREE 0.55
 #define YVOLTPERDEGREE 0.525
 
-
-//#define XOFFSET -0.08		// x-offset for centering galvo to target (in volts)
-//#define YOFFSET -0.13		// y-offset for centering galvo to target (in volts)
 
 #define XOFFSET -0.25		// x-offset for centering galvo to target (in volts)
 #define YOFFSET -0.315		// y-offset for centering galvo to target (in volts)
