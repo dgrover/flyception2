@@ -17,7 +17,6 @@ bool manual_track = false;
 
 bool flyview_record = false;
 bool arenaview_record = false;
-//bool arenaview_mask = false;
 bool flashPressed = false;
 
 struct fvwritedata
@@ -97,7 +96,6 @@ int _tmain(int argc, _TCHAR* argv[])
 	Sleep(1000);
 
 	// initialize camera link gazelle camera
-
 	SapAcquisition	*Acq	 = NULL;
 	SapBuffer		*Buffers = NULL;
 	SapView			*View	 = NULL;
@@ -109,7 +107,6 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	acqServerName = "Xcelera-CL_PX4_1";
 	acqDeviceNumber = 0;
-	//configFilename = "C:\\Program Files\\Teledyne DALSA\\Sapera\\CamFiles\\User\\P_GZL-CL-20C5M_Gazelle_240x240.ccf";
 	configFilename = "..\\ccf\\P_GZL-CL-20C5M_Gazelle_240x240.ccf";
 	
 	printf("Initializing camera link fly view camera ");
@@ -199,13 +196,9 @@ int _tmain(int argc, _TCHAR* argv[])
 	error = busMgr.GetCameraFromIndex(0, &guid);
 	error = arena_cam.Connect(guid);
 	error = arena_cam.SetCameraParameters(arena_image_left, arena_image_top, arena_image_width, arena_image_height);
-	//arena_cam.GetImageSize(arena_image_width, arena_image_height);
-
 	error = arena_cam.SetTrigger();
 	error = arena_cam.SetProperty(SHUTTER, 3.002);
 	error = arena_cam.SetProperty(GAIN, 0.0);
-
-	//error = arena_cam.Start();
 	error = arena_cam.cam.StartCapture(OnImageGrabbed);
 
 	if (error != PGRERROR_OK)
@@ -244,7 +237,6 @@ int _tmain(int argc, _TCHAR* argv[])
 	int focal_fly = 0;
 	bool comp_bg = true;
 
-	//Mat fly_element = getStructuringElement(MORPH_RECT, Size(9, 9), Point(4, 4));
 	Mat fly_element = getStructuringElement(MORPH_RECT, Size(3, 3), Point(1, 1));
 	Mat arena_element = getStructuringElement(MORPH_RECT, Size(3, 3), Point(1, 1));
 
@@ -258,7 +250,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	float d_01, d_02, d_12;
 	bool three_point_tracking = false;
 
-	//Press [F1] to start/stop tracking, [F2] to start/stop recording, [ESC] to exit.
+	//Press [F1] to start/stop fly-view tracking, [F2] to start/stop recording, [ESC] to exit.
 	#pragma omp parallel sections num_threads(7)
 	{
 		#pragma omp section
@@ -328,10 +320,9 @@ int _tmain(int argc, _TCHAR* argv[])
 								{
 									for (int i = 0; i < NBEADS; i++)
 									{
-										int j = findClosestPoint(pt[i], bead_ctr_pts);
+										int j = findClosestPoint(bpt[i], bead_ctr_pts);
 
 										bead_pt[i] = bead_ctr_pts[j];
-										//pt[i] = bead_ctr_pts[j];
 
 										putText(fly_frame, to_string(i), bead_pt[i], FONT_HERSHEY_COMPLEX, 0.4, Scalar(0, 0, 0));
 
@@ -358,7 +349,6 @@ int _tmain(int argc, _TCHAR* argv[])
 										int j = findClosestPoint(bead_ctr_pts[i], last_bead_pt);
 
 										bead_pt[bead_pt_ind[j]] = bead_ctr_pts[i];
-										//pt[bead_pt_ind[j]] = bead_ctr_pts[i];
 
 										putText(fly_frame, to_string(bead_pt_ind[j]), bead_pt[bead_pt_ind[j]], FONT_HERSHEY_COMPLEX, 0.4, Scalar(0, 0, 0));
 
@@ -497,11 +487,9 @@ int _tmain(int argc, _TCHAR* argv[])
 								pt2d.y = total_y / contour_count;
 
 								//drawContours(fly_frame, fly_contours, j, Scalar(255, 255, 255), 1, 8, vector<Vec4i>(), 0, Point());
-								
 								//drawContours(fly_mask, fly_contours, j, Scalar(255, 255, 255), FILLED, 1);
 								//drawContours(fly_frame, hull, j, Scalar::all(255), 1, 8, vector<Vec4i>(), 0, Point());
 
-								//circle(fly_frame, pt2d, 1, Scalar(255, 255, 255), FILLED, 1);
 								drawMarker(fly_frame, pt2d, Scalar(255, 255, 255), MARKER_TILTED_CROSS, 5, 1);
 
 								Point2f rotpt = rotateFlyCenter(pt2d, fly_image_width, fly_image_height);
@@ -568,12 +556,6 @@ int _tmain(int argc, _TCHAR* argv[])
 			Image img;
 			int arena_last = 0, arena_fps = 0;
 			
-			//int arena_last_radius = arena_radius;
-
-			//int count_frames = 0;
-			//int count_bg = 0;
-			
-
 			while (true)
 			{
 				if (aq.try_pop(img))
@@ -587,44 +569,19 @@ int _tmain(int argc, _TCHAR* argv[])
 					arena_img = tframe.clone();
 					arena_frame = tframe.clone();
 					
-					//accumulateWeighted(arena_frame, arena_mean, 0.05);
-					//arena_mean.convertTo(arena_bg, CV_8UC1);
-
-					//if (comp_init_bg)
-					//{
-					//	arena_bg = tframe.clone();
-					//	accumulate(arena_frame, arena_mean);
-					//	count_bg++;
-					//	comp_init_bg = false;
-					//}
-
-					//if (count_frames++ == 50000)
-					//	comp_bg = true;
-
 					if (comp_bg)
 					{
-						//count_bg++;
-						
-						//accumulate(arena_frame, arena_mean);
-						//arena_bg = arena_mean / count_bg;
-						//arena_bg.convertTo(arena_bg, CV_8UC1);
-
 						arena_bg = tframe.clone();
-						
-						//count_frames = 0;
 						comp_bg = false;
 					}
 
 					subtract(arena_bg, arena_frame, arena_mask);
 					threshold(arena_mask, arena_mask, arena_thresh, 255, THRESH_BINARY);
 
-					//threshold(arena_frame, arena_mask, arena_thresh, 255, THRESH_BINARY_INV);
-					
 					outer_mask = Mat::zeros(Size(arena_image_width, arena_image_height), CV_8UC1);
 					ellipse(outer_mask, el_center, Size(el_maj_axis, el_min_axis), el_angle, 0, 360, Scalar(255, 255, 255), FILLED);
 					arena_mask &= outer_mask;
 
-					//morphologyEx(arena_mask, arena_mask, MORPH_OPEN, arena_element);
 					erode(arena_mask, arena_mask, arena_element, Point(-1, -1), arena_erode);
 					dilate(arena_mask, arena_mask, arena_element, Point(-1, -1), arena_dilate);
 
@@ -708,7 +665,6 @@ int _tmain(int argc, _TCHAR* argv[])
 
 					arenaDispStream.try_enqueue(arena_frame.clone());
 					arenaMaskStream.try_enqueue(arena_mask.clone());
-					//arenaMaskStream.try_enqueue(arena_bg.clone());
 
 					if (arenaview_record)
 					{
@@ -802,10 +758,6 @@ int _tmain(int argc, _TCHAR* argv[])
 			namedWindow("controls", WINDOW_AUTOSIZE);
 			createTrackbar("arena thresh", "controls", &arena_thresh, 255);
 			createTrackbar("fly thresh", "controls", &fly_thresh, 255);
-			
-			//if (NFLIES > 1)
-			//	createTrackbar("focal fly", "controls", &focal_fly, NFLIES-1);
-			
 			createTrackbar("fly erode", "controls", &fly_erode, 5);
 			createTrackbar("fly dilate", "controls", &fly_dilate, 5);
 			createTrackbar("arena erode", "controls", &arena_erode, 5);
@@ -871,21 +823,9 @@ int _tmain(int argc, _TCHAR* argv[])
 		{
 			int record_key_state = 0;
 			int track_key_state = 0;
-			//int arena_track_key_state = 0;
-
 			int flash_key_state = 0;
-			
 			int bg_key_state = 0;
-			
-			//int left_key_state = 0;
-			//int right_key_state = 0;
-			//int up_key_state = 0;
-			//int down_key_state = 0;
-
 			int fly_key_state = 0;
-
-			//int min_inc_foc_state = 0;
-			//int min_dec_foc_state = 0;
 
 			int inc_foc_state = 0;
 			int dec_foc_state = 0;
@@ -951,19 +891,6 @@ int _tmain(int argc, _TCHAR* argv[])
 				//else
 				//	min_dec_foc_state = 0;
 								
-				//if (GetAsyncKeyState(VK_HOME))
-				//{
-				//	if (!arena_track_key_state)
-				//	{
-				//		manual_track = false;
-				//		flyview_track = false;
-				//	}
-
-				//	arena_track_key_state = 1;
-				//}
-				//else
-				//	arena_track_key_state = 0;
-
 				if (GetAsyncKeyState(VK_TAB))
 				{
 					if (!fly_key_state)
