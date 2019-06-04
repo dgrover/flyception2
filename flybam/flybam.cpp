@@ -81,6 +81,7 @@ void OnImageGrabbed(Image* pImage, const void* pCallbackData)
 
 int _tmain(int argc, _TCHAR* argv[])
 {
+	/*
 	// init arduino for camera lens control
 	Serial* SP = new Serial("COM4");    // adjust as needed
 
@@ -94,6 +95,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	Sleep(1000);
 	SP->WriteData("S", 1);
 	Sleep(1000);
+	*/
 
 	// initialize camera link gazelle camera
 	SapAcquisition	*Acq	 = NULL;
@@ -107,6 +109,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	acqServerName = "Xcelera-CL_PX4_1";
 	acqDeviceNumber = 0;
+	
 	//configFilename = "..\\ccf\\P_GZL-CL-20C5M_Gazelle_240x240.ccf";
 	configFilename = "..\\ccf\\P_GZL-CL-20C5M_Gazelle_256x256.ccf";
 	
@@ -853,7 +856,7 @@ int _tmain(int argc, _TCHAR* argv[])
 				if (GetAsyncKeyState(VK_NUMPAD1))
 				{
 					if (!inc_foc_state)
-						SP->WriteData("1", 1);
+						ndq.lensCommand('1');//SP->WriteData("1", 1);
 					inc_foc_state = 1;
 				}
 				else
@@ -862,17 +865,16 @@ int _tmain(int argc, _TCHAR* argv[])
 				if (GetAsyncKeyState(VK_NUMPAD2))
 				{
 					if (!dec_foc_state)
-						SP->WriteData("!", 1);
+						ndq.lensCommand('2');//SP->WriteData("!", 1);
 					dec_foc_state = 1;
 				}
 				else
 					dec_foc_state = 0;
 
-
 				if (GetAsyncKeyState(VK_NUMPAD4))
 				{
 					if (!max_foc_state)
-						SP->WriteData("5", 1);
+						ndq.lensCommand('4');//SP->WriteData("5", 1);
 					max_foc_state = 1;
 				}
 				else
@@ -881,30 +883,12 @@ int _tmain(int argc, _TCHAR* argv[])
 				if (GetAsyncKeyState(VK_NUMPAD5))
 				{
 					if (!min_foc_state)
-						SP->WriteData("6", 1);
+						ndq.lensCommand('5');//SP->WriteData("6", 1);
 					min_foc_state = 1;
 				}
 				else
 					min_foc_state = 0;
-
-				//if (GetAsyncKeyState(VK_NUMPAD7))
-				//{
-				//	if (!min_inc_foc_state)
-				//		SP->WriteData("0", 1);
-				//	min_inc_foc_state = 1;
-				//}
-				//else
-				//	min_inc_foc_state = 0;
-
-				//if (GetAsyncKeyState(VK_NUMPAD8))
-				//{
-				//	if (!min_dec_foc_state)
-				//		SP->WriteData(")", 1);
-				//	min_dec_foc_state = 1;
-				//}
-				//else
-				//	min_dec_foc_state = 0;
-								
+				
 				if (GetAsyncKeyState(VK_TAB))
 				{
 					if (!fly_key_state)
