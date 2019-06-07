@@ -33,6 +33,7 @@ struct avwritedata
 	Mat img;
 	TimeStamp stamp;
 	vector<Point2f> pts;
+	vector<double> szs;
 };
 
 concurrent_queue<Mat> q;
@@ -152,7 +153,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	//int fly_image_width = 240, fly_image_height = 240;
 	int fly_image_width = 256, fly_image_height = 256;
 
-	Point el_center(260, 227);
+	Point el_center(260, 220);
 	int el_maj_axis = 237, el_min_axis = 133;
 	int el_angle = 178;
 
@@ -182,7 +183,6 @@ int _tmain(int argc, _TCHAR* argv[])
 	FVFmfWriter fvfout;
 	AVFmfWriter avfout;
 
-	vector<Point2f> pt(NFLIES);
 	vector<Point2f> arena_pt(NFLIES);
 
 	fvwritedata fvin;
@@ -576,6 +576,9 @@ int _tmain(int argc, _TCHAR* argv[])
 			{
 				if (aq.try_pop(img))
 				{
+					vector<Point2f> fly_pt(NFLIES);
+					vector<double> fly_sz(NFLIES);
+					
 					arena_fps = ConvertTimeToFPS(img.GetTimeStamp().cycleCount, arena_last);
 					arena_last = img.GetTimeStamp().cycleCount;
 
@@ -610,8 +613,10 @@ int _tmain(int argc, _TCHAR* argv[])
 						// Get the moments and mass centers
 						vector<Moments> arena_mu(arena_contours.size());
 						vector<Point2f> arena_mc(arena_contours.size());
+						vector<double> arena_sz(arena_contours.size());
 
 						vector<Point2f> arena_ctr_pts;
+						vector<double> arena_ctr_sz;
 
 						for (int i = 0; i < arena_contours.size(); i++)
 						{
@@ -619,13 +624,14 @@ int _tmain(int argc, _TCHAR* argv[])
 							arena_mu[i] = moments(arena_contours[i], false);
 							arena_mc[i] = Point2f(arena_mu[i].m10 / arena_mu[i].m00, arena_mu[i].m01 / arena_mu[i].m00);
 
-							double csize = contourArea(arena_contours[i]);
+							arena_sz[i] = contourArea(arena_contours[i]);
 
-							if (csize > 10)
+							if (arena_sz[i] > 10)
 							{
 								//drawContours(arena_frame, arena_contours, i, Scalar(255, 255, 255), 1, 8, vector<Vec4i>(), 0, Point());
 								drawContours(arena_mask, arena_contours, i, Scalar(255, 255, 255), FILLED, 1);
 								arena_ctr_pts.push_back(arena_mc[i]);
+								arena_ctr_sz.push_back(arena_sz[i]);
 							}
 						}
 
@@ -636,11 +642,14 @@ int _tmain(int argc, _TCHAR* argv[])
 								int j = findClosestPoint(arena_pt[i], arena_ctr_pts);
 
 								arena_pt[i] = arena_ctr_pts[j];
-								pt[i] = arena_pt[i];
+								
+								fly_pt[i] = arena_pt[i];
+								fly_sz[i] = arena_ctr_sz[j];
 
 								putText(arena_frame, to_string(i), arena_pt[i], FONT_HERSHEY_COMPLEX, 0.2, Scalar(255, 255, 255));
 
 								arena_ctr_pts.erase(arena_ctr_pts.begin() + j);
+								arena_ctr_sz.erase(arena_ctr_sz.begin() + j);
 							}
 						}
 						else if (arena_ctr_pts.size() < NFLIES)
@@ -656,8 +665,11 @@ int _tmain(int argc, _TCHAR* argv[])
 								int j = findClosestPoint(arena_ctr_pts[i], last_arena_pt);
 
 								arena_pt[arena_pt_ind[j]] = arena_ctr_pts[i];
-								pt[arena_pt_ind[j]] = arena_pt[arena_pt_ind[j]];
 								
+								fly_pt[arena_pt_ind[j]] = arena_pt[arena_pt_ind[j]];
+								fly_sz[arena_pt_ind[j]] = arena_ctr_sz[i];
+
+
 								putText(arena_frame, to_string(arena_pt_ind[j]), arena_pt[arena_pt_ind[j]], FONT_HERSHEY_COMPLEX, 0.2, Scalar(255, 255, 255));
 
 								last_arena_pt.erase(last_arena_pt.begin() + j);
@@ -667,7 +679,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 						if (!flyview_track && !manual_track)
 						{
-							int j = findClosestPoint(pt[focal_fly], raster_pts);
+							int j = findClosestPoint(arena_pt[focal_fly], raster_pts);
 							ndq.SetGalvoAngles(raster_angles[j]);
 							ndq.write();
 						}
@@ -686,7 +698,8 @@ int _tmain(int argc, _TCHAR* argv[])
 					{
 						avin.img = arena_img;
 						avin.stamp = img.GetTimeStamp();
-						avin.pts = pt;
+						avin.pts = fly_pt;
+						avin.szs = fly_sz;
 
 						avwdata.push(avin);
 
@@ -751,11 +764,12 @@ int _tmain(int argc, _TCHAR* argv[])
 						avfout.Open();
 						avfout.InitHeader(arena_image_width, arena_image_height);
 						avfout.WriteHeader();
+						avfout.WriteBG(arena_bg);
 					}
 
 					avfout.WriteFrame(out.img);
 					avfout.WriteLog(out.stamp);
-					avfout.WriteTraj(out.pts);
+					avfout.WriteTraj(out.pts, out.szs);
 					avfout.nframes++;
 				}
 				else
