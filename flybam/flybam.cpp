@@ -19,6 +19,8 @@ bool flyview_record = false;
 bool arenaview_record = false;
 bool flashPressed = false;
 
+bool odorpulse = false;
+
 struct fvwritedata
 {
 	Mat img;
@@ -26,6 +28,7 @@ struct fvwritedata
 	Point2f laser;
 	Point2f head;
 	Point2f galvo_angle;
+	int odor;
 };
 
 struct avwritedata
@@ -98,6 +101,12 @@ int _tmain(int argc, _TCHAR* argv[])
 	Sleep(1000);
 	*/
 
+	// init arduino for camera lens control
+	Serial* OD = new Serial("COM8");    // adjust as needed
+
+	if (OD->IsConnected())
+		printf("odor pulse controller connected [OK]\n");
+
 	// initialize camera link gazelle camera
 	SapAcquisition	*Acq	 = NULL;
 	SapBuffer		*Buffers = NULL;
@@ -111,8 +120,8 @@ int _tmain(int argc, _TCHAR* argv[])
 	acqServerName = "Xcelera-CL_PX4_1";
 	acqDeviceNumber = 0;
 	
-	//configFilename = "..\\ccf\\P_GZL-CL-20C5M_Gazelle_240x240.ccf";
-	configFilename = "..\\ccf\\P_GZL-CL-20C5M_Gazelle_256x256.ccf";
+	configFilename = "..\\ccf\\P_GZL-CL-20C5M_Gazelle_240x240.ccf";
+	//configFilename = "..\\ccf\\P_GZL-CL-20C5M_Gazelle_256x256.ccf";
 	
 	printf("Initializing camera link fly view camera ");
 
@@ -150,8 +159,8 @@ int _tmain(int argc, _TCHAR* argv[])
 	int arena_image_width = 512, arena_image_height = 512;
 	int arena_image_left = 384, arena_image_top = 256;
 
-	//int fly_image_width = 240, fly_image_height = 240;
-	int fly_image_width = 256, fly_image_height = 256;
+	int fly_image_width = 240, fly_image_height = 240;
+	//int fly_image_width = 256, fly_image_height = 256;
 
 	Point el_center(260, 220);
 	int el_maj_axis = 237, el_min_axis = 133;
@@ -204,10 +213,10 @@ int _tmain(int argc, _TCHAR* argv[])
 	error = arena_cam.SetTrigger();
 	
 	//shutter setting for 0.1A power
-	//error = arena_cam.SetProperty(SHUTTER, 3.002);
+	error = arena_cam.SetProperty(SHUTTER, 3.002);
 	
 	//shutter setting for 0.75A power
-	error = arena_cam.SetProperty(SHUTTER, 0.249);
+	//error = arena_cam.SetProperty(SHUTTER, 0.249);
 	
 	error = arena_cam.SetProperty(GAIN, 0.0);
 	error = arena_cam.cam.StartCapture(OnImageGrabbed);
@@ -237,12 +246,12 @@ int _tmain(int argc, _TCHAR* argv[])
 	Mat arena_mean = Mat::zeros(arena_image_width, arena_image_height, CV_32F);
 
 	// thresholds for fly-view image at 0.1A power
-	//int arena_thresh = 65;
-	//int fly_thresh = 150;
+	int arena_thresh = 65;
+	int fly_thresh = 150;
 
 	// thresholds for fly-view image at 0.75A power
-	int arena_thresh = 45;
-	int fly_thresh = 175;
+	//int arena_thresh = 45;
+	//int fly_thresh = 175;
 
 	int fly_erode = 0;
 	int fly_dilate = 3;
@@ -552,6 +561,10 @@ int _tmain(int argc, _TCHAR* argv[])
 							fvin.head = pt2d;
 							fvin.laser = wpt;
 							fvin.galvo_angle = galvo_mirror_angle;
+							fvin.odor = odorpulse;
+
+							if (odorpulse)
+								odorpulse = false;
 
 							fvwdata.push(fvin);
 							fvrcount++;
@@ -732,7 +745,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 					fvfout.WriteFrame(out.img);
 					fvfout.WriteLog(out.stamp);
-					fvfout.WriteTraj(out.laser, out.head, out.galvo_angle);
+					fvfout.WriteTraj(out.laser, out.head, out.galvo_angle, out.odor);
 					
 					fvfout.nframes++;
 				}
@@ -864,6 +877,8 @@ int _tmain(int argc, _TCHAR* argv[])
 			int min_foc_state = 0;
 			
 			int reset_galvo_state = 0;
+
+			int od_key_state = 0;
 
 			while (true)
 			{
@@ -1122,6 +1137,21 @@ int _tmain(int argc, _TCHAR* argv[])
 				}
 				else
 					flash_key_state = 0;
+
+				if (GetAsyncKeyState(VK_F6))
+				{
+					if (!od_key_state)
+					{
+						if (OD->IsConnected())
+							OD->WriteData("2", 1);
+
+						odorpulse = true;
+					}
+
+					od_key_state = 1;
+				}
+				else
+					od_key_state = 0;
 			}
 		}
 	}
