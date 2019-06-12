@@ -105,7 +105,10 @@ int _tmain(int argc, _TCHAR* argv[])
 	Serial* OD = new Serial("COM8");    // adjust as needed
 
 	if (OD->IsConnected())
+	{
 		printf("odor pulse controller connected [OK]\n");
+		OD->WriteData("0", 1);
+	}
 
 	// initialize camera link gazelle camera
 	SapAcquisition	*Acq	 = NULL;
@@ -563,12 +566,12 @@ int _tmain(int argc, _TCHAR* argv[])
 							fvin.galvo_angle = galvo_mirror_angle;
 							fvin.odor = odorpulse;
 
-							if (odorpulse)
-								odorpulse = false;
-
 							fvwdata.push(fvin);
 							fvrcount++;
 						}
+
+						if (odorpulse)
+							odorpulse = false;
 
 						if (flashPressed)
 							flashcount++;
@@ -1143,7 +1146,7 @@ int _tmain(int argc, _TCHAR* argv[])
 					if (!od_key_state)
 					{
 						if (OD->IsConnected())
-							OD->WriteData("2", 1);
+							OD->WriteData("1", 1);
 
 						odorpulse = true;
 					}
