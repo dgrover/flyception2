@@ -8,12 +8,13 @@ const int led1 = 4;  //port 2
 int qt = 2000;
 
 void setup() {
-        Serial.begin(9600);     // opens serial port, sets data rate to 9600 bps
+        Serial.begin(19200);     // opens serial port, sets data rate to 19200 bps
         pinMode(led0,OUTPUT);
         pinMode(led1,OUTPUT);
         digitalWrite(led0,LOW);
         digitalWrite(led1,HIGH);
 }
+
 void loop() 
 {
         // send data only when you receive data:
@@ -21,12 +22,12 @@ void loop()
                 // read the incoming byte:
                 incomingByte = Serial.read();
                 
-                if (incomingByte > 48)
-                {
-                  digitalWrite(led0,LOW);
-                }
+                //if (incomingByte > 48)
+                //{
+                //  digitalWrite(led0,LOW);
+                //}
                 
-                if (incomingByte > 49)
+                if (incomingByte == 49)
                 {
 
                   digitalWrite(led0,HIGH);

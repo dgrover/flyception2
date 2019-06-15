@@ -105,10 +105,8 @@ int _tmain(int argc, _TCHAR* argv[])
 	Serial* OD = new Serial("COM8");    // adjust as needed
 
 	if (OD->IsConnected())
-	{
 		printf("odor pulse controller connected [OK]\n");
-		OD->WriteData("0", 1);
-	}
+
 
 	// initialize camera link gazelle camera
 	SapAcquisition	*Acq	 = NULL;
