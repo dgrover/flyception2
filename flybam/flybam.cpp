@@ -555,8 +555,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 						if (flyview_record)
 						{
-							//fvin.img = fly_img;
-							fvin.img = fly_frame;
+							fvin.img = fly_img;
 							fvin.stamp = fly_now;
 							fvin.head = pt2d;
 							fvin.laser = wpt;
