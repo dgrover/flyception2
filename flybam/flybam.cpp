@@ -14,6 +14,7 @@ bool stream = true;
 
 bool flyview_track = false;
 bool manual_track = false;
+bool z_track = false;
 
 bool flyview_record = false;
 bool arenaview_record = false;
@@ -37,6 +38,7 @@ struct avwritedata
 };
 
 concurrent_queue<Mat> q;
+concurrent_queue<Mat> zq;
 concurrent_queue<int> sq;
 concurrent_queue<Image> aq;
 
@@ -45,8 +47,12 @@ ReaderWriterQueue<Mat> arenaDispStream(1), arenaMaskStream(1), flyDispStream(1),
 concurrent_queue<fvwritedata> fvwdata;
 concurrent_queue<avwritedata> avwdata;
 
-Mat frame;
+concurrent_queue<double> fmq;
+
+Mat frame, zframe;
 int stamp;
+
+int z_count = 0;
 
 static void AcqCallback(SapXferCallbackInfo *pInfo)
 {
@@ -64,9 +70,13 @@ static void AcqCallback(SapXferCallbackInfo *pInfo)
 
 	Mat tframe(height, width, CV_8U, (void*)pData);
 	frame = tframe.clone();
+	zframe = tframe.clone();
 
 	sq.push(stamp);
 	q.push(frame);
+	
+	if ((++z_count % Z_PERIOD) == 0)
+		zq.push(zframe);
 }
 
 void OnImageGrabbed(Image* pImage, const void* pCallbackData)
@@ -78,6 +88,19 @@ void OnImageGrabbed(Image* pImage, const void* pCallbackData)
 	aq.push(img);
 	
 	return;
+}
+
+// LAPV algorithm
+double varianceOfLaplacian(const cv::Mat& src)
+{
+	cv::Mat lap;
+	cv::Laplacian(src, lap, CV_64F);
+
+	cv::Scalar mu, sigma;
+	cv::meanStdDev(lap, mu, sigma);
+
+	double focusMeasure = sigma.val[0] * sigma.val[0];
+	return focusMeasure;
 }
 
 int _tmain(int argc, _TCHAR* argv[])
@@ -232,7 +255,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	ellipse(outer_mask, el_center, Size(el_maj_axis, el_min_axis), el_angle, 0, 360, Scalar(255, 255, 255), FILLED);
 
 	Mat arena_img, arena_frame, arena_mask, arena_bg;
-	Mat fly_img, fly_frame, fly_fg, fly_mask;
+	Mat fly_img, fly_frame, fly_fg, fly_mask, fly_z_frame;
 
 	Mat arena_mean = Mat::zeros(arena_image_width, arena_image_height, CV_32F);
 
@@ -266,8 +289,10 @@ int _tmain(int argc, _TCHAR* argv[])
 	float d_01, d_02, d_12;
 	bool three_point_tracking = false;
 
+	double fm = 0;
+
 	//Press [F1] to start/stop fly-view tracking, [F2] to start/stop recording, [ESC] to exit.
-	#pragma omp parallel sections num_threads(7)
+	#pragma omp parallel sections num_threads(9)
 	{
 		#pragma omp section
 		{
@@ -299,6 +324,8 @@ int _tmain(int argc, _TCHAR* argv[])
 
 						erode(fly_fg, fly_mask, fly_element, Point(-1, -1), fly_erode);
 						dilate(fly_mask, fly_mask, fly_element, Point(-1, -1), fly_dilate);
+
+						//double fm = varianceOfLaplacian(fly_frame);
 
 						if (flyview_track)
 						{
@@ -543,6 +570,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 						putText(fly_frame, to_string((int)fly_fps), Point((fly_image_width - 50), 10), FONT_HERSHEY_COMPLEX, 0.4, Scalar(255, 255, 255));
 						putText(fly_frame, to_string(q.unsafe_size()), Point((fly_image_width - 50), 20), FONT_HERSHEY_COMPLEX, 0.4, Scalar(255, 255, 255));
+						putText(fly_frame, to_string((int)fm), Point((fly_image_width - 50), 30), FONT_HERSHEY_COMPLEX, 0.4, Scalar(255, 255, 255));
 
 						if (manual_track)
 							drawMarker(fly_frame, Point2f(fly_image_width/2, fly_image_height/2), Scalar(255, 255, 255), MARKER_CROSS, 20, 1);
@@ -568,6 +596,69 @@ int _tmain(int argc, _TCHAR* argv[])
 						if (flashPressed)
 							flashcount++;
 					}
+				}
+
+				if (!stream)
+					break;
+			}
+		}
+
+		#pragma omp section
+		{
+			Mat tframe;
+
+			//int count = 0;
+			//double avg_fm = 0;
+
+			while (true)
+			{
+				if (zq.try_pop(tframe))
+				{
+					fly_z_frame = tframe.clone();
+
+					fm = varianceOfLaplacian(fly_z_frame);
+
+					//if (count == 0)
+					//	avg_fm = fm;
+					//else
+					//	avg_fm = (avg_fm + fm) / 2;
+
+					//if (++count == MAX_Z_BASELINE)
+					//{
+					//	fmq.push(avg_fm);
+					//	count = 0;
+					//	avg_fm = 0;
+					//}
+
+					fmq.push(fm);
+				}
+
+				if (!stream)
+					break;
+			}
+		}
+
+		#pragma omp section
+		{
+			double tfm, base_fm;
+			bool z_track_init = false;
+
+			while (true)
+			{
+				if (fmq.try_pop(tfm))
+				{
+					if (z_track)
+					{
+						if (z_track_init != z_track)
+							base_fm = tfm;
+
+						if (abs(tfm - base_fm) > Z_EPSILON)
+						{ }
+
+
+					}
+
+					z_track_init = z_track;
 				}
 
 				if (!stream)
@@ -864,6 +955,7 @@ int _tmain(int argc, _TCHAR* argv[])
 			int flash_key_state = 0;
 			int bg_key_state = 0;
 			int fly_key_state = 0;
+			int z_track_key_state = 0;
 
 			int inc_foc_state = 0;
 			int dec_foc_state = 0;
@@ -877,8 +969,11 @@ int _tmain(int argc, _TCHAR* argv[])
 			{
 				if (GetAsyncKeyState(VK_NUMPAD1))
 				{
+					z_track = false;
+
 					if (!inc_foc_state)
 						ndq.lensCommand('1');//SP->WriteData("1", 1);
+					
 					inc_foc_state = 1;
 				}
 				else
@@ -886,8 +981,11 @@ int _tmain(int argc, _TCHAR* argv[])
 
 				if (GetAsyncKeyState(VK_NUMPAD2))
 				{
+					z_track = false;
+
 					if (!dec_foc_state)
 						ndq.lensCommand('2');//SP->WriteData("!", 1);
+					
 					dec_foc_state = 1;
 				}
 				else
@@ -895,8 +993,11 @@ int _tmain(int argc, _TCHAR* argv[])
 
 				if (GetAsyncKeyState(VK_NUMPAD4))
 				{
+					z_track = false;
+
 					if (!max_foc_state)
 						ndq.lensCommand('4');//SP->WriteData("5", 1);
+					
 					max_foc_state = 1;
 				}
 				else
@@ -904,8 +1005,11 @@ int _tmain(int argc, _TCHAR* argv[])
 
 				if (GetAsyncKeyState(VK_NUMPAD5))
 				{
+					z_track = false;
+
 					if (!min_foc_state)
 						ndq.lensCommand('5');//SP->WriteData("6", 1);
+					
 					min_foc_state = 1;
 				}
 				else
@@ -924,6 +1028,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 						manual_track = false;
 						flyview_track = false;
+						z_track = false;
 					}
 
 					fly_key_state = 1;
@@ -951,6 +1056,7 @@ int _tmain(int argc, _TCHAR* argv[])
 				if ((1 << 15) & leftKeyState)
 				{
 					flyview_track = false;
+					z_track = false;
 					manual_track = true;
 					ndq.MoveLeft();
 					ndq.write();
@@ -975,6 +1081,7 @@ int _tmain(int argc, _TCHAR* argv[])
 				if ((1 << 15) & rightKeyState)
 				{
 					flyview_track = false;
+					z_track = false;
 					manual_track = true;
 					ndq.MoveRight();
 					ndq.write();
@@ -999,6 +1106,7 @@ int _tmain(int argc, _TCHAR* argv[])
 				if ((1 << 15) & upKeyState)
 				{
 					flyview_track = false;
+					z_track = false;
 					manual_track = true;
 					ndq.MoveUp();
 					ndq.write();
@@ -1023,6 +1131,7 @@ int _tmain(int argc, _TCHAR* argv[])
 				if ((1 << 15) & downKeyState)
 				{
 					flyview_track = false;
+					z_track = false;
 					manual_track = true;
 					ndq.MoveDown();
 					ndq.write();
@@ -1035,6 +1144,7 @@ int _tmain(int argc, _TCHAR* argv[])
 						flyview_track = !flyview_track;
 
 						manual_track = false;
+						z_track = false;
 					}
 
 					track_key_state = 1;
@@ -1067,6 +1177,19 @@ int _tmain(int argc, _TCHAR* argv[])
 				}
 				else
 					bg_key_state = 0;
+
+				if (GetAsyncKeyState(VK_F6))
+				{
+					if (!z_track_key_state)
+					{
+						z_track = !z_track;
+						manual_track = false;
+					}
+
+					z_track_key_state = 1;
+				}
+				else
+					z_track_key_state = 0;
 
 				if (GetAsyncKeyState(VK_ESCAPE))
 				{

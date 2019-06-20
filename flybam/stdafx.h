@@ -57,7 +57,7 @@
 #define SCALEY 0.0018
 
 #define PX_UM_FACTOR 4.931
-#define UM_MOVE_THRESH 30.0
+#define UM_MOVE_THRESH 20.0
 #define PX_MOVE_THRESH UM_MOVE_THRESH/PX_UM_FACTOR
 
 #define NFLIES 1
@@ -70,5 +70,8 @@
 #define MIN_MARKER_SIZE 10
 #define MAX_MARKER_SIZE 500
 #define NBEADS 3
+
+#define Z_PERIOD 1000/200
+#define Z_EPSILON 10.0
 
 // TODO: reference additional headers your program requires here
