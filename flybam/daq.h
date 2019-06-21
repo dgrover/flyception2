@@ -27,7 +27,7 @@ public:
 	void start();
 	void startTrigger();
 	void stopTrigger();
-	void lensCommand(char cmd);
+	void lensCommand(int cmd);
 	void write();
 	void flashHigh();
 	void flashLow();

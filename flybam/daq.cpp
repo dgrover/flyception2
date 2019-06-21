@@ -69,27 +69,27 @@ void Daq::flashLow()
 	DAQmxWriteDigitalLines(taskHandleDig, 1, 1, 10.0, DAQmx_Val_GroupByChannel, dataDig, NULL, NULL);
 }
 
-void Daq::lensCommand(char cmd)
+void Daq::lensCommand(int cmd)
 {
 	switch (cmd) {
 
 		// Move -10 Steps
-	case '1':
+	case 0:
 		dataDig[4] = 0;
 		dataDig[3] = 0;
 		break;
 		// Move +10 Steps
-	case '2':
+	case 1:
 		dataDig[4] = 0;
 		dataDig[3] = 1;
 		break;
 		// Move to Min
-	case '4':
+	case 2:
 		dataDig[4] = 1;
 		dataDig[3] = 0;
 		break;
 		// Move to Max
-	case '5':
+	case 3:
 		dataDig[4] = 1;
 		dataDig[3] = 1;
 		break;
