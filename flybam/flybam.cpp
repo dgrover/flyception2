@@ -507,6 +507,7 @@ int _tmain(int argc, _TCHAR* argv[])
 								//drawContours(fly_frame, hull, j, Scalar::all(255), 1, 8, vector<Vec4i>(), 0, Point());
 
 								drawMarker(fly_frame, pt2d, Scalar(255, 255, 255), MARKER_TILTED_CROSS, 5, 1);
+								drawMarker(fly_frame, Point2f(fly_image_width / 2, fly_image_height / 2), Scalar(255, 255, 255), MARKER_CROSS, 5, 1);
 
 								Point2f rotpt = rotateFlyCenter(pt2d, fly_image_width, fly_image_height);
 
@@ -515,10 +516,16 @@ int _tmain(int argc, _TCHAR* argv[])
 
 								float mag = dist(rotpt, Point2f(fly_image_width / 2, fly_image_height / 2));
 
-								if (mag > PX_MOVE_THRESH)
+								if (mag > PX_MOVE_THRESH_HIGH)
 								{
-									diffx = diffx / mag * PX_MOVE_THRESH;
-									diffy = diffy / mag * PX_MOVE_THRESH;
+									diffx = diffx / mag * PX_MOVE_THRESH_HIGH;
+									diffy = diffy / mag * PX_MOVE_THRESH_HIGH;
+								}
+
+								if (mag < PX_MOVE_THRESH_LOW)
+								{
+									diffx = 0;
+									diffy = 0;
 								}
 
 								ndq.ConvertPixelToDeg(diffx*SCALEX, diffy*SCALEY);
@@ -555,7 +562,8 @@ int _tmain(int argc, _TCHAR* argv[])
 
 						if (flyview_record)
 						{
-							fvin.img = fly_img;
+							//fvin.img = fly_img;
+							fvin.img = fly_frame;
 							fvin.stamp = fly_now;
 							fvin.head = pt2d;
 							fvin.laser = wpt;
