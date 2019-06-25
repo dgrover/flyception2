@@ -53,12 +53,8 @@
 #define XOFFSET -0.25		// x-offset for centering galvo to target (in volts)
 #define YOFFSET -0.315		// y-offset for centering galvo to target (in volts)
 
-#define SCALEX 0.0018
-#define SCALEY 0.0022
-
-#define PX_UM_FACTOR 4.931
-#define UM_MOVE_THRESH 50.0
-#define PX_MOVE_THRESH UM_MOVE_THRESH/PX_UM_FACTOR
+#define SCALEX 0.0008
+#define SCALEY 0.0008
 
 #define NFLIES 1
 #define NLOSTFRAMES 5
@@ -71,7 +67,7 @@
 #define MAX_MARKER_SIZE 500
 #define NBEADS 3
 
-#define Z_PERIOD 1000/200
-#define Z_EPSILON 20.0
+#define Z_PERIOD 100
+#define Z_EPSILON 10.0
 
 // TODO: reference additional headers your program requires here

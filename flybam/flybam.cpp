@@ -227,10 +227,10 @@ int _tmain(int argc, _TCHAR* argv[])
 	error = arena_cam.SetTrigger();
 	
 	//shutter setting for 0.1A power
-	//error = arena_cam.SetProperty(SHUTTER, 3.002);
+	error = arena_cam.SetProperty(SHUTTER, 3.002);
 	
 	//shutter setting for 0.75A power
-	error = arena_cam.SetProperty(SHUTTER, 0.249);
+	//error = arena_cam.SetProperty(SHUTTER, 0.249);
 	
 	error = arena_cam.SetProperty(GAIN, 0.0);
 	error = arena_cam.cam.StartCapture(OnImageGrabbed);
@@ -541,14 +541,6 @@ int _tmain(int argc, _TCHAR* argv[])
 								float diffx = rotpt.x - (fly_image_width / 2);
 								float diffy = rotpt.y - (fly_image_height / 2);
 
-								float mag = dist(rotpt, Point2f(fly_image_width / 2, fly_image_height / 2));
-
-								if (mag > PX_MOVE_THRESH)
-								{
-									diffx = diffx / mag * PX_MOVE_THRESH;
-									diffy = diffy / mag * PX_MOVE_THRESH;
-								}
-
 								ndq.ConvertPixelToDeg(diffx*SCALEX, diffy*SCALEY);
 								wpt = ndq.ConvertDegToPt();
 								galvo_mirror_angle = ndq.GetGalvoAngles();
@@ -564,6 +556,7 @@ int _tmain(int argc, _TCHAR* argv[])
 									flyview_track = false;
 									manual_track = false;
 									three_point_tracking = false;
+									z_track = false;
 									ndq.reset();
 								}
 							}
@@ -655,6 +648,8 @@ int _tmain(int argc, _TCHAR* argv[])
 									dz = rand() % 2;
 									ndq.lensCommand(dz);
 									z_state = 1;
+
+									printf("0 -> 1 %d\n", fvrcount);
 								}
 
 								break;
@@ -666,19 +661,47 @@ int _tmain(int argc, _TCHAR* argv[])
 									{
 										ndq.lensCommand(1 - dz);
 										z_state = 2;
+
+										printf("1 -> 2 %d\n", fvrcount);
 									}
 									else
+									{
 										z_state = 0;
+										printf("1 -> 0 %d\n", fvrcount);
+									}
 								}
 								else
+								{
 									z_state = 0;
+									printf("1 -> 00 %d\n", fvrcount);
+								}
 
 								break;
 
 							case 2:
-								ndq.lensCommand(1 - dz);
-								z_state = 3;
+								if (delta > Z_EPSILON)
+								{
+									if (last_fm > cfm)
+									{
+										ndq.lensCommand(1 - dz);
+										z_state = 3;
 
+										printf("2 -> 3 %d\n", fvrcount);
+									}
+									else
+									{
+										z_state = 0;
+
+										printf("2 -> 0 %d\n", fvrcount);
+									}
+								}
+								else
+								{
+									z_state = 0;
+
+									printf("2 -> 00 %d\n", fvrcount);
+								}
+								
 								break;
 
 							case 3:
@@ -688,8 +711,14 @@ int _tmain(int argc, _TCHAR* argv[])
 									{
 										ndq.lensCommand(dz);
 										z_track = false;
+
+										printf("3 -> 0 %d\n\n", fvrcount);
 									}
+									else
+										printf("3 -> 00 %d\n", fvrcount);
 								}
+								else
+									printf("3 -> 000 %d\n", fvrcount);
 
 								z_state = 0;
 
