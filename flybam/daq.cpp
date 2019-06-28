@@ -16,6 +16,11 @@ Daq::Daq()
 	for (int i = 0; i < 8; i++)
 		dataDig[i] = 0;
 
+	ifB0 = 3;
+	ifB1 = 4;
+	ifB2 = 5;
+
+
 }
 
 void Daq::configure()
@@ -69,31 +74,75 @@ void Daq::flashLow()
 	DAQmxWriteDigitalLines(taskHandleDig, 1, 1, 10.0, DAQmx_Val_GroupByChannel, dataDig, NULL, NULL);
 }
 
+/*
+* Lens Interface
+  DAq  ->  Arduino  Pin
+  -----------------------
+	3  ->  5		Bit 0
+	4  ->  6		Bit 1
+	5  ->  7		Bit 2
+
+* Lens Commands
+	Code	-		Command
+	0		-		Move down coarse
+	1		-		Move up coarse
+	2		-		Move down fine
+	3		-		Move up	fine
+	4		-		Move down to min
+	5		-		Move up to max
+	6		-		Query lens position 
+
+*/
 void Daq::lensCommand(int cmd)
 {
 	switch (cmd) {
 
-		// Move -10 Steps
+	// Move -Z_STEP_COARSE Steps
 	case 0:
-		dataDig[4] = 0;
-		dataDig[3] = 0;
+		dataDig[ifB2] = 0;
+		dataDig[ifB1] = 0;
+		dataDig[ifB0] = 0;
 		break;
-		// Move +10 Steps
+	// Move +Z_STEP_COARSE Steps
 	case 1:
-		dataDig[4] = 0;
-		dataDig[3] = 1;
+		dataDig[ifB2] = 0;
+		dataDig[ifB1] = 0;
+		dataDig[ifB0] = 1;
 		break;
-		// Move to Min
+	// Move -Z_STEP_FINE Steps
 	case 2:
-		dataDig[4] = 1;
-		dataDig[3] = 0;
+		dataDig[ifB2] = 0;
+		dataDig[ifB1] = 2;
+		dataDig[ifB0] = 0;
 		break;
-		// Move to Max
+	// Move +Z_STEP_FINE Steps
 	case 3:
-		dataDig[4] = 1;
-		dataDig[3] = 1;
+		dataDig[ifB2] = 0;
+		dataDig[ifB1] = 1;
+		dataDig[ifB0] = 1;
+		break;
+	// Move to Min
+	case 4:
+		dataDig[ifB2] = 1;
+		dataDig[ifB1] = 0;
+		dataDig[ifB0] = 0;
+
+		break;
+	// Move to Max
+	case 5:
+		dataDig[ifB2] = 1;
+		dataDig[ifB1] = 0;
+		dataDig[ifB0] = 1;
+
+		break;
+	// Query lens position over serial
+	case 6:
+		dataDig[ifB2] = 1;
+		dataDig[ifB1] = 1;
+		dataDig[ifB0] = 0;
 		break;
 	}
+
 	dataDig[2] = !dataDig[2];
 	DAQmxWriteDigitalLines(taskHandleDig, 1, 1, 10.0, DAQmx_Val_GroupByChannel, dataDig, NULL, NULL);
 }

@@ -19,6 +19,9 @@ private:
 	float64     dataX[STEP_SIZE];
 	float64     dataY[STEP_SIZE];
 	uInt8       dataDig[8];
+	uInt8		ifB0;
+	uInt8		ifB1;
+	uInt8		ifB2;
 
 public:
 	Daq();
@@ -40,6 +43,7 @@ public:
 	void MoveRight();
 	void MoveUp();
 	void MoveDown();
+	void PollLensPosition();
 };
 
 #endif

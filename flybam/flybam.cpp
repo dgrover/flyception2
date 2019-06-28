@@ -27,6 +27,8 @@ struct fvwritedata
 	Point2f laser;
 	Point2f head;
 	Point2f galvo_angle;
+	int z_tracking;
+	int lens_pos;
 };
 
 struct avwritedata
@@ -53,6 +55,8 @@ Mat frame, zframe;
 int stamp;
 
 int z_count = 0;
+int lens_pos = 0;
+char serial_buffer[2] = { 0 };
 
 static void AcqCallback(SapXferCallbackInfo *pInfo)
 {
@@ -105,21 +109,20 @@ double varianceOfLaplacian(const cv::Mat& src)
 
 int _tmain(int argc, _TCHAR* argv[])
 {
-	/*
+	
 	// init arduino for camera lens control
 	Serial* SP = new Serial("COM4");    // adjust as needed
 
 	if (SP->IsConnected())
 		printf("Connecting lens controller arduino [OK]\n");
 
-	printf("Sending lens sync command [OK]\n");
+	//printf("Sending lens sync command [OK]\n");
 
 	// sending 'S' to sync lens twice
-	SP->WriteData("S", 1);
-	Sleep(1000);
-	SP->WriteData("S", 1);
-	Sleep(1000);
-	*/
+	//SP->WriteData("S", 1);
+	//Sleep(1000);
+	//SP->WriteData("S", 1);
+	//Sleep(1000);
 
 	// initialize camera link gazelle camera
 	SapAcquisition	*Acq	 = NULL;
@@ -249,6 +252,15 @@ int _tmain(int argc, _TCHAR* argv[])
 	ndq.write();
 
 	ndq.startTrigger();
+
+	// Query for lens position
+	ndq.lensCommand(6);
+	Sleep(1000);
+	if (SP->ReadData(serial_buffer, 2))
+		printf("Read: %d\n", (int16)*serial_buffer);
+
+	//TODO: Add counter to all lens moves
+
 
 	//create arena mask
 	Mat outer_mask = Mat::zeros(Size(arena_image_width, arena_image_height), CV_8UC1);
@@ -585,6 +597,8 @@ int _tmain(int argc, _TCHAR* argv[])
 							fvin.head = pt2d;
 							fvin.laser = wpt;
 							fvin.galvo_angle = galvo_mirror_angle;
+							fvin.z_tracking = z_track;
+							fvin.lens_pos = lens_pos;
 
 							fvwdata.push(fvin);
 							fvrcount++;
@@ -628,6 +642,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 			int z_state = 0;
 			int dz = 0;
+			int curr_dir;
 
 			while (true)
 			{
@@ -646,7 +661,9 @@ int _tmain(int argc, _TCHAR* argv[])
 								if (delta > Z_EPSILON)
 								{
 									dz = rand() % 2;
-									ndq.lensCommand(dz);
+									curr_dir = ((dz == 0) ? -1 : 1);
+									ndq.lensCommand(dz + 2);
+									lens_pos = lens_pos + Z_STEP_FINE * curr_dir;
 									z_state = 1;
 
 									printf("0 -> 1 %d\n", fvrcount);
@@ -655,16 +672,16 @@ int _tmain(int argc, _TCHAR* argv[])
 								break;
 
 							case 1:
-								if (delta > Z_EPSILON)
+								if (delta > Z_EPSILON) // If not withing eps
 								{
-									if (last_fm > cfm)
+									if (last_fm > cfm) // If worse
 									{
-										ndq.lensCommand(1 - dz);
+										ndq.lensCommand((1 - dz));
 										z_state = 2;
-
+										lens_pos = lens_pos - Z_STEP_COARSE * curr_dir;
 										printf("1 -> 2 %d\n", fvrcount);
 									}
-									else
+									else // If better
 									{
 										z_state = 0;
 										printf("1 -> 0 %d\n", fvrcount);
@@ -678,39 +695,14 @@ int _tmain(int argc, _TCHAR* argv[])
 
 								break;
 
-							case 2:
-								if (delta > Z_EPSILON)
-								{
-									if (last_fm > cfm)
-									{
-										ndq.lensCommand(1 - dz);
-										z_state = 3;
-
-										printf("2 -> 3 %d\n", fvrcount);
-									}
-									else
-									{
-										z_state = 0;
-
-										printf("2 -> 0 %d\n", fvrcount);
-									}
-								}
-								else
-								{
-									z_state = 0;
-
-									printf("2 -> 00 %d\n", fvrcount);
-								}
-								
-								break;
-
 							case 3:
 								if (delta > Z_EPSILON)
 								{
 									if (last_fm > cfm)
 									{
-										ndq.lensCommand(dz);
+										ndq.lensCommand(dz + 2);
 										z_track = false;
+										lens_pos = lens_pos + Z_STEP_FINE * curr_dir;
 
 										printf("3 -> 0 %d\n\n", fvrcount);
 									}
@@ -722,7 +714,53 @@ int _tmain(int argc, _TCHAR* argv[])
 
 								z_state = 0;
 
-								break;
+							// Code for 1 -> 2 in 2 steps
+							//case 2:
+							//	if (delta > Z_EPSILON)
+							//	{
+							//		if (last_fm > cfm)
+							//		{
+							//			ndq.lensCommand(1 - dz);
+							//			z_state = 3;
+
+							//			printf("2 -> 3 %d\n", fvrcount);
+							//		}
+							//		else
+							//		{
+							//			z_state = 0;
+
+							//			printf("2 -> 0 %d\n", fvrcount);
+							//		}
+							//	}
+							//	else
+							//	{
+							//		z_state = 0;
+
+							//		printf("2 -> 00 %d\n", fvrcount);
+							//	}
+							//	
+							//	break;
+
+							//case 3:
+							//	if (delta > Z_EPSILON)
+							//	{
+							//		if (last_fm > cfm)
+							//		{
+							//			ndq.lensCommand(dz);
+							//			z_track = false;
+
+							//			printf("3 -> 0 %d\n\n", fvrcount);
+							//		}
+							//		else
+							//			printf("3 -> 00 %d\n", fvrcount);
+							//	}
+							//	else
+							//		printf("3 -> 000 %d\n", fvrcount);
+
+							//	z_state = 0;
+
+							//	break;
+
 						}
 					}
 					else
@@ -905,7 +943,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 					fvfout.WriteFrame(out.img);
 					fvfout.WriteLog(out.stamp);
-					fvfout.WriteTraj(out.laser, out.head, out.galvo_angle);
+					fvfout.WriteTraj(out.laser, out.head, out.galvo_angle, out.z_tracking, out.lens_pos);
 					
 					fvfout.nframes++;
 				}
@@ -1051,8 +1089,11 @@ int _tmain(int argc, _TCHAR* argv[])
 					z_track = false;
 
 					if (!inc_foc_state)
-						ndq.lensCommand(0);//SP->WriteData("1", 1);
-					
+					{
+						ndq.lensCommand(0); // 0: Move down coarse
+						lens_pos -= Z_STEP_COARSE;
+					}
+
 					inc_foc_state = 1;
 				}
 				else
@@ -1062,33 +1103,39 @@ int _tmain(int argc, _TCHAR* argv[])
 				{
 					z_track = false;
 
-					if (!dec_foc_state)
-						ndq.lensCommand(1);//SP->WriteData("!", 1);
+					if (!dec_foc_state) 
+					{
+						ndq.lensCommand(1); // 1: Move up coarse
+						lens_pos += Z_STEP_COARSE;
+					}
 					
 					dec_foc_state = 1;
 				}
 				else
 					dec_foc_state = 0;
 
-				if (GetAsyncKeyState(VK_NUMPAD4))
-				{
-					z_track = false;
+				// Max not implemented
+				//if (GetAsyncKeyState(VK_NUMPAD4))
+				//{
+				//	z_track = false;
 
-					if (!max_foc_state)
-						ndq.lensCommand(2);//SP->WriteData("5", 1);
-					
-					max_foc_state = 1;
-				}
-				else
-					max_foc_state = 0;
+				//	if (!max_foc_state)
+				//		ndq.lensCommand(6);
+				//	
+				//	max_foc_state = 1;
+				//}
+				//else
+				//	max_foc_state = 0;
 
 				if (GetAsyncKeyState(VK_NUMPAD5))
 				{
 					z_track = false;
 
 					if (!min_foc_state)
-						ndq.lensCommand(3);//SP->WriteData("6", 1);
-					
+					{
+						ndq.lensCommand(4); // 4: Move to min
+						lens_pos = 0;
+					}
 					min_foc_state = 1;
 				}
 				else

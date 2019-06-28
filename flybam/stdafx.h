@@ -69,5 +69,8 @@
 
 #define Z_PERIOD 100
 #define Z_EPSILON 10.0
+#define Z_STEP_COARSE 10.0
+#define Z_STEP_FINE 5.0
+
 
 // TODO: reference additional headers your program requires here
