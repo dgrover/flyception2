@@ -95,53 +95,68 @@ void Daq::flashLow()
 */
 void Daq::lensCommand(int cmd)
 {
-	switch (cmd) {
+	switch (cmd) 
+	{
 
-	// Move -Z_STEP_COARSE Steps
+		// Move -Z_STEP_COARSE Steps
 	case 0:
 		dataDig[ifB2] = 0;
 		dataDig[ifB1] = 0;
 		dataDig[ifB0] = 0;
+
 		break;
-	// Move +Z_STEP_COARSE Steps
+		// Move +Z_STEP_COARSE Steps
 	case 1:
 		dataDig[ifB2] = 0;
 		dataDig[ifB1] = 0;
 		dataDig[ifB0] = 1;
+
 		break;
-	// Move -Z_STEP_FINE Steps
+		// Move -Z_STEP_FINE Steps
 	case 2:
 		dataDig[ifB2] = 0;
-		dataDig[ifB1] = 2;
+		dataDig[ifB1] = 1;
 		dataDig[ifB0] = 0;
+
 		break;
-	// Move +Z_STEP_FINE Steps
+		// Move +Z_STEP_FINE Steps
 	case 3:
 		dataDig[ifB2] = 0;
 		dataDig[ifB1] = 1;
 		dataDig[ifB0] = 1;
+
 		break;
-	// Move to Min
+		// Move to Min
 	case 4:
 		dataDig[ifB2] = 1;
 		dataDig[ifB1] = 0;
 		dataDig[ifB0] = 0;
 
 		break;
-	// Move to Max
+		// Move to Max
 	case 5:
 		dataDig[ifB2] = 1;
 		dataDig[ifB1] = 0;
 		dataDig[ifB0] = 1;
 
 		break;
-	// Query lens position over serial
+		// Query lens position over serial
 	case 6:
 		dataDig[ifB2] = 1;
 		dataDig[ifB1] = 1;
 		dataDig[ifB0] = 0;
+
+		break;
+
+		// Empty Command
+	case 7:
+		dataDig[ifB2] = 1;
+		dataDig[ifB1] = 1;
+		dataDig[ifB0] = 1;
+
 		break;
 	}
+
 
 	dataDig[2] = !dataDig[2];
 	DAQmxWriteDigitalLines(taskHandleDig, 1, 1, 10.0, DAQmx_Val_GroupByChannel, dataDig, NULL, NULL);

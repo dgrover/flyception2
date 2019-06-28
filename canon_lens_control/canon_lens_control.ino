@@ -207,58 +207,48 @@ void commandLensISR() {
   // Send Command
   switch(cmd) {
     case 0:
-      //Serial.write("Move down coarse\n");
+      Serial.write("Move down coarse\n");
       moveSteps(-(STEP_COARSE + 1));
       lens_pos -= STEP_COARSE;
       break;
     case 1:
-      //Serial.write("Move up coarse\n");
+      Serial.write("Move up coarse\n");
       moveSteps(STEP_COARSE);
       lens_pos += STEP_COARSE;
       break;
     case 2:
-      //Serial.write("Move down fine\n");
+      Serial.write("Move down fine\n");
       moveSteps(-(STEP_FINE + 1));
       lens_pos -= STEP_FINE;
       break;
     case 3:
-      //Serial.write("Move up fine\n");
+      Serial.write("Move up fine\n");
       moveSteps(STEP_FINE);
       lens_pos += STEP_FINE;
       break;
     case 4:
-      //Serial.write("Move min\n");
+      Serial.write("Move min\n");
       moveMin();
       lens_pos = 0;
       break;
     case 5:
-      //Serial.write("Move max\n");
+      Serial.write("Move max\n");
       moveMax();
       lens_pos = 0;
       //lens_pos += STEP_FINE;      
       break;
     case 6:
       //Serial.write("Query z position\n");
-
-
-      //Serial.print(serial_buffer[0],BIN);
-      //Serial.print("\n");
-      //Serial.print(serial_buffer[1],BIN);
-      //Serial.print("\n");
-      
-      //Serial.print(lens_pos);
-      //Serial.print("\n");      
       serial_buffer[1] = lens_pos & 0xFF;
       serial_buffer[0] = (lens_pos >> 8) & 0xFF;
-
-      //Serial.print(serial_buffer[0],BIN);
-      //Serial.print("\n");
-      //Serial.print(serial_buffer[1],BIN);
-      //Serial.print("\n");
-
-      
       Serial.write(serial_buffer,sizeof(serial_buffer));
-      //Serial.print("\n");
+      break;
+    case 7:
+      //Serial.write("Query z position\n");
+      serial_buffer[1] = lens_pos & 0xFF;
+      serial_buffer[0] = (lens_pos >> 8) & 0xFF;
+      Serial.print(lens_pos);
+      Serial.print("\n");
       break;
   }
 }

@@ -110,19 +110,6 @@ double varianceOfLaplacian(const cv::Mat& src)
 int _tmain(int argc, _TCHAR* argv[])
 {
 	
-	// init arduino for camera lens control
-	Serial* SP = new Serial("COM4");    // adjust as needed
-
-	if (SP->IsConnected())
-		printf("Connecting lens controller arduino [OK]\n");
-
-	//printf("Sending lens sync command [OK]\n");
-
-	// sending 'S' to sync lens twice
-	//SP->WriteData("S", 1);
-	//Sleep(1000);
-	//SP->WriteData("S", 1);
-	//Sleep(1000);
 
 	// initialize camera link gazelle camera
 	SapAcquisition	*Acq	 = NULL;
@@ -137,6 +124,32 @@ int _tmain(int argc, _TCHAR* argv[])
 	acqServerName = "Xcelera-CL_PX4_1";
 	acqDeviceNumber = 0;
 	
+	//configure and start NIDAQ
+	Daq ndq;
+	ndq.configure();
+	ndq.start();
+	ndq.write();
+
+	ndq.startTrigger();
+
+
+	// init arduino for camera lens control
+	Serial* SP = new Serial("COM4");    // adjust as needed
+
+	if (SP->IsConnected())
+		printf("Connecting lens controller arduino [OK]\n");
+
+	// Query for lens position
+	ndq.lensCommand(6);
+	printf("Reading initial lens position from Arduino...\n");
+	Sleep(1000);
+	if (SP->ReadData(serial_buffer, 2))
+		printf("Inital Lens Position: %d\n", (int16)*serial_buffer);
+
+	// Shutdown Serial
+	printf("Closing serial connection...\n");
+	SP->~Serial();
+
 	configFilename = "..\\ccf\\P_GZL-CL-20C5M_Gazelle_240x240.ccf";
 	//configFilename = "..\\ccf\\P_GZL-CL-20C5M_Gazelle_256x256.ccf";
 	
@@ -244,23 +257,6 @@ int _tmain(int argc, _TCHAR* argv[])
 		return -1;
 	}
 	printf("[OK]\n");
-
-	//configure and start NIDAQ
-	Daq ndq;
-	ndq.configure();
-	ndq.start();
-	ndq.write();
-
-	ndq.startTrigger();
-
-	// Query for lens position
-	ndq.lensCommand(6);
-	Sleep(1000);
-	if (SP->ReadData(serial_buffer, 2))
-		printf("Read: %d\n", (int16)*serial_buffer);
-
-	//TODO: Add counter to all lens moves
-
 
 	//create arena mask
 	Mat outer_mask = Mat::zeros(Size(arena_image_width, arena_image_height), CV_8UC1);
@@ -655,6 +651,77 @@ int _tmain(int argc, _TCHAR* argv[])
 
 						double delta = base_fm - cfm;
 
+						// Code for 4 state
+						switch (z_state)
+						{
+							case 0:
+								if (delta > Z_EPSILON)
+								{
+									dz = rand() % 2;
+									curr_dir = ((dz == 0) ? -1 : 1);
+									ndq.lensCommand(dz + 2);
+									lens_pos = lens_pos + Z_STEP_FINE * curr_dir;
+									z_state = 1;
+
+									printf("0 -> 1 %d\n", fvrcount);
+								}
+
+								break;
+
+							case 1:
+								if (delta > Z_EPSILON) // If not withing eps
+								{
+									if (last_fm > cfm) // If worse move two steps the other way
+									{
+										ndq.lensCommand(1 - dz);
+										lens_pos = lens_pos - Z_STEP_COARSE * curr_dir;
+										z_state = 2;
+										
+										printf("1 -> 2 %d\n", fvrcount);
+									}
+									else // If better try again then init
+									{
+										ndq.lensCommand(dz + 2);
+										lens_pos = lens_pos + Z_STEP_FINE * curr_dir;
+										z_state = 0;
+
+										printf("1 -> 00 %d\n", fvrcount);
+									}
+								}
+								else // If within eps -> init
+								{
+									z_state = 0;
+
+									printf("1 -> 000 %d\n", fvrcount);
+								}
+
+								break;
+
+							case 2: // Third state only transistions to init 2 -> 0
+								if (delta > Z_EPSILON)
+								{
+									if (last_fm > cfm) // If worse move back to original
+									{
+										ndq.lensCommand(dz + 2);
+										z_track = false; // Maybe
+										lens_pos = lens_pos + Z_STEP_FINE * curr_dir;
+										printf("2 -> 0 %d\n\n", fvrcount);
+									}
+									else
+									{
+										ndq.lensCommand((1 - dz) + 2); // If better try again then init
+										lens_pos = lens_pos - Z_STEP_FINE * curr_dir;
+										printf("2 -> 00 %d\n", fvrcount);
+									}
+								}
+								else
+								{
+									printf("2 -> 000 %d\n", fvrcount); // If within eps -> init
+								}
+
+								z_state = 0;
+
+						/* Code for 3-state and terminate
 						switch (z_state)
 						{
 							case 0:
@@ -695,7 +762,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 								break;
 
-							case 3:
+							case 2:
 								if (delta > Z_EPSILON)
 								{
 									if (last_fm > cfm)
@@ -713,6 +780,9 @@ int _tmain(int argc, _TCHAR* argv[])
 									printf("3 -> 000 %d\n", fvrcount);
 
 								z_state = 0;
+
+							*/
+
 
 							// Code for 1 -> 2 in 2 steps
 							//case 2:
@@ -1114,20 +1184,7 @@ int _tmain(int argc, _TCHAR* argv[])
 				else
 					dec_foc_state = 0;
 
-				// Max not implemented
-				//if (GetAsyncKeyState(VK_NUMPAD4))
-				//{
-				//	z_track = false;
-
-				//	if (!max_foc_state)
-				//		ndq.lensCommand(6);
-				//	
-				//	max_foc_state = 1;
-				//}
-				//else
-				//	max_foc_state = 0;
-
-				if (GetAsyncKeyState(VK_NUMPAD5))
+				if (GetAsyncKeyState(VK_NUMPAD4))
 				{
 					z_track = false;
 
@@ -1140,6 +1197,19 @@ int _tmain(int argc, _TCHAR* argv[])
 				}
 				else
 					min_foc_state = 0;
+
+				// Max not implemented
+				if (GetAsyncKeyState(VK_NUMPAD5))
+				{
+					z_track = false;
+
+					if (!max_foc_state)
+						ndq.lensCommand(7);
+					
+					max_foc_state = 1;
+				}
+				else
+					max_foc_state = 0;
 				
 				if (GetAsyncKeyState(VK_TAB))
 				{
