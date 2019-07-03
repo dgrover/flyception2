@@ -67,4 +67,6 @@
 #define MAX_MARKER_SIZE 500
 #define NBEADS 3
 
+#define Z_STEP 10.0
+
 // TODO: reference additional headers your program requires here

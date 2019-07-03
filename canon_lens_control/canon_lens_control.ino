@@ -1,12 +1,33 @@
 #include <SPI.h>
+/*
+ * Interface Commands (3-bit mode)
+ * 
+ * 000 (0) - Move down coarse step size
+ * 001 (1) - Move up coarse step size
+ * 010 (2) - Move down fine step size
+ * 011 (3) - Move up coarse step size
+ * 100 (4) - Move lense to down to min
+ * 101 (5) - Move lense up to max
+ * 
+ */
+
+// Step size parameters
+#define STEP_FINE          5
+#define STEP_COARSE        10
 
 // xxxset up the speed, data order and data mode
  SPISettings cameraSetting(10000, MSBFIRST, SPI_MODE2);
 
 // DAQ Interface
 const int daqToggle = 3; // DAQ Digital 2
-const int daqB1     = 6; // DAQ Digital 3
-const int daqB0     = 5; // DAQ Digital 4
+
+const int daqB0     = 5; // DAQ Digital 3
+const int daqB1     = 6; // DAQ Digital 4
+const int daqB2     = 7; // DAQ Digital 5
+
+// Lens position
+int focal_plane = 0;
+
 // Lens Interface
 const int chipSelectPin = 10;
 const int messagePin = 9;
@@ -16,6 +37,7 @@ uint8_t outputByte, inputByte;
 const int delayTime = 200;
 //const int delayTime = 100;
 int inByte;
+char serial_buffer[2];
 
 void setup() 
 {
@@ -31,6 +53,7 @@ void setup()
   
   // Initialize DAQ interface
   pinMode(daqToggle, INPUT);
+  pinMode(daqB2, INPUT);
   pinMode(daqB1, INPUT);
   pinMode(daqB0, INPUT);
 
@@ -49,6 +72,7 @@ void setup()
 void loop() {
   
   // ISR Service Toggle Pin
+  // Listen for query
   
 }
 
@@ -156,33 +180,73 @@ void moveMax() {
     digitalWrite(messagePin, LOW);
 }
 
+
+
+/*
+ * Interface Commands (3-bit mode)
+ * 
+ * 000 (0) - Move down coarse step size
+ * 001 (1) - Move up coarse step size
+ * 010 (2) - Move down fine step size
+ * 011 (3) - Move up coarse step size
+ * 100 (4) - Move lense to down to min
+ * 101 (5) - Move lense up to max
+ * 
+ */
+
 void commandLensISR() {
 
   // Read Interface
-  int cmd = (PIND & B01100000) >> 5;
-
-  //Serial.print(cmd);
+  int cmd = (PIND & B11100000) >> 5;
+  
+  //Serial.print(cmd,BIN);
   //Serial.print('\n');
   // Synchronize Lens
   syncLens();
   
   // Send Command
   switch(cmd) {
-    case 0:
-      //Serial.write("Move down\n");
-      moveSteps(-11);
-      break;
     case 1:
-      //Serial.write("Move up\n");
-      moveSteps(10);
+      //Serial.write("Move down coarse\n");
+      if ((focal_plane - STEP_COARSE) >= 0)
+      {
+        moveSteps(-(STEP_COARSE + 1));
+        focal_plane -= STEP_COARSE;
+      }
       break;
     case 2:
-      //Serial.write("Move min\n");
-      moveMin();
+      //Serial.write("Move up coarse\n");
+      moveSteps(STEP_COARSE);
+      focal_plane += STEP_COARSE;
       break;
     case 3:
+      //Serial.write("Move down fine\n");
+      if ((focal_plane - STEP_FINE) >= 0)
+      {
+        moveSteps(-(STEP_FINE + 1));
+        focal_plane -= STEP_FINE;
+      }
+      break;
+    case 4:
+      //Serial.write("Move up fine\n");
+      moveSteps(STEP_FINE);
+      focal_plane += STEP_FINE;
+      break;
+    case 5:
+      //Serial.write("Move min\n");
+      moveMin();
+      focal_plane = 9999;
+      break;
+    case 6:
       //Serial.write("Move max\n");
-      moveMax();
+      moveMax(); // Max lens position -> lowest focal position w +z towards lens
+      focal_plane = 0; 
+      break;
+    case 7:
+      //Serial.write("Query z position\n");
+      serial_buffer[0] = focal_plane & 0xFF;
+      serial_buffer[1] = (focal_plane >> 8) & 0xFF;
+      Serial.write(serial_buffer,sizeof(serial_buffer));
       break;
   }
 }
