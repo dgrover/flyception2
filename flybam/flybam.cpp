@@ -132,23 +132,34 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	ndq.startTrigger();
 
-
 	// init arduino for camera lens control
 	Serial* SP = new Serial("COM4");    // adjust as needed
 
 	if (SP->IsConnected())
+	{
 		printf("Connecting lens controller arduino [OK]\n");
 
-	// Query for lens position
-	ndq.lensCommand(6);
-	printf("Reading initial lens position from Arduino...\n");
-	Sleep(1000);
-	if (SP->ReadData(serial_buffer, 2))
-		printf("Inital Lens Position: %d\n", (int16)*serial_buffer);
+		// Query for lens position
+		ndq.lensCommand(7);
 
-	// Shutdown Serial
-	printf("Closing serial connection...\n");
-	SP->~Serial();
+		printf("Reading initial lens position from Arduino...\n");
+		Sleep(2000);
+
+		if (SP->ReadData(serial_buffer, 2))
+		{
+			lens_pos = (int16)*serial_buffer;
+			printf("Inital Lens Position: %d\n", lens_pos);
+		}
+		else
+			printf("Read failed\n");
+
+		// Shutdown Serial
+		//printf("Closing serial connection...\n");
+		SP->~Serial();
+	}
+	else
+		printf("Failed connecting to arduino over serial\n");
+
 
 	configFilename = "..\\ccf\\P_GZL-CL-20C5M_Gazelle_240x240.ccf";
 	//configFilename = "..\\ccf\\P_GZL-CL-20C5M_Gazelle_256x256.ccf";
@@ -570,6 +581,8 @@ int _tmain(int argc, _TCHAR* argv[])
 							}
 						}
 
+						putText(fly_frame, to_string(lens_pos), Point(0, 10), FONT_HERSHEY_COMPLEX, 0.4, Scalar(255, 255, 255));
+
 						putText(fly_frame, to_string((int)fly_fps), Point((fly_image_width - 50), 10), FONT_HERSHEY_COMPLEX, 0.4, Scalar(255, 255, 255));
 						putText(fly_frame, to_string(q.unsafe_size()), Point((fly_image_width - 50), 20), FONT_HERSHEY_COMPLEX, 0.4, Scalar(255, 255, 255));
 						
@@ -580,7 +593,7 @@ int _tmain(int argc, _TCHAR* argv[])
 							drawMarker(fly_frame, Point2f(fly_image_width/2, fly_image_height/2), Scalar(255, 255, 255), MARKER_CROSS, 20, 1);
 
 						if (flyview_record)
-							putText(fly_frame, to_string(fvrcount), Point(0, 10), FONT_HERSHEY_COMPLEX, 0.4, Scalar(255, 255, 255));
+							putText(fly_frame, to_string(fvrcount), Point(0, 20), FONT_HERSHEY_COMPLEX, 0.4, Scalar(255, 255, 255));
 
 						flyDispStream.try_enqueue(fly_frame.clone());
 						flyMaskStream.try_enqueue(fly_mask.clone());
@@ -657,7 +670,7 @@ int _tmain(int argc, _TCHAR* argv[])
 							case 0:
 								if (delta > Z_EPSILON)
 								{
-									dz = rand() % 2;
+									dz = (rand() % 2) + 1;
 									curr_dir = ((dz == 0) ? -1 : 1);
 									ndq.lensCommand(dz + 2);
 									lens_pos = lens_pos + Z_STEP_FINE * curr_dir;
@@ -1147,11 +1160,6 @@ int _tmain(int argc, _TCHAR* argv[])
 			
 			int reset_galvo_state = 0;
 
-			//int left_key_state = 0;
-			//int right_key_state = 0;
-			//int up_key_state = 0;
-			//int down_key_state = 0;
-
 			while (true)
 			{
 				if (GetAsyncKeyState(VK_NUMPAD1))
@@ -1160,8 +1168,11 @@ int _tmain(int argc, _TCHAR* argv[])
 
 					if (!inc_foc_state)
 					{
-						ndq.lensCommand(0); // 0: Move down coarse
-						lens_pos -= Z_STEP_COARSE;
+						if ((lens_pos - Z_STEP_COARSE) >= 0)
+						{
+							lens_pos -= Z_STEP_COARSE;
+							ndq.lensCommand(1); // 1: Move step (coarse) toward max lens position -> move focal plane toward camera
+						}
 					}
 
 					inc_foc_state = 1;
@@ -1175,7 +1186,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 					if (!dec_foc_state) 
 					{
-						ndq.lensCommand(1); // 1: Move up coarse
+						ndq.lensCommand(2); // 2: Move step (coarse) toward min lens position -> move focal plane toward backlight
 						lens_pos += Z_STEP_COARSE;
 					}
 					
@@ -1184,32 +1195,38 @@ int _tmain(int argc, _TCHAR* argv[])
 				else
 					dec_foc_state = 0;
 
+				// Max lens position -> min focal toward camera (-z up)
 				if (GetAsyncKeyState(VK_NUMPAD4))
 				{
 					z_track = false;
 
-					if (!min_foc_state)
-					{
-						ndq.lensCommand(4); // 4: Move to min
-						lens_pos = 0;
-					}
-					min_foc_state = 1;
-				}
-				else
-					min_foc_state = 0;
-
-				// Max not implemented
-				if (GetAsyncKeyState(VK_NUMPAD5))
-				{
-					z_track = false;
-
 					if (!max_foc_state)
-						ndq.lensCommand(7);
+					{
+						lens_pos = 0;
+						ndq.lensCommand(6);
+					}
 					
 					max_foc_state = 1;
 				}
 				else
 					max_foc_state = 0;
+
+				// Min lens position -> max focal toward backlight (+z down)
+				if (GetAsyncKeyState(VK_NUMPAD5))
+				{
+					z_track = false;
+
+					if (!min_foc_state)
+					{
+						lens_pos = 9999;
+						ndq.lensCommand(5);
+					}
+
+					min_foc_state = 1;
+				}
+				else
+					min_foc_state = 0;
+
 				
 				if (GetAsyncKeyState(VK_TAB))
 				{
@@ -1232,23 +1249,6 @@ int _tmain(int argc, _TCHAR* argv[])
 				else
 					fly_key_state = 0;
 
-
-				//if (GetAsyncKeyState(VK_LEFT))
-				//{
-				//	if (!left_key_state)
-				//	{
-				//		flyview_track = false;
-				//		z_track = false;
-				//		manual_track = true;
-				//		ndq.MoveLeft();
-				//		ndq.write();
-				//	}
-
-				//	left_key_state = 1;
-				//}
-				//else
-				//	left_key_state = 0;
-
 				SHORT leftKeyState = GetAsyncKeyState(VK_LEFT);
 
 				if ((1 << 15) & leftKeyState)
@@ -1259,22 +1259,6 @@ int _tmain(int argc, _TCHAR* argv[])
 					ndq.MoveLeft();
 					ndq.write();
 				}
-
-				//if (GetAsyncKeyState(VK_RIGHT))
-				//{
-				//	if (!right_key_state)
-				//	{
-				//		flyview_track = false;
-				//		z_track = false;
-				//		manual_track = true;
-				//		ndq.MoveRight();
-				//		ndq.write();
-				//	}
-
-				//	right_key_state = 1;
-				//}
-				//else
-				//	right_key_state = 0;
 
 				SHORT rightKeyState = GetAsyncKeyState(VK_RIGHT);
 
@@ -1287,22 +1271,6 @@ int _tmain(int argc, _TCHAR* argv[])
 					ndq.write();
 				}
 
-				//if (GetAsyncKeyState(VK_UP))
-				//{
-				//	if (!up_key_state)
-				//	{
-				//		flyview_track = false;
-				//		z_track = false;
-				//		manual_track = true;
-				//		ndq.MoveUp();
-				//		ndq.write();
-				//	}
-
-				//	up_key_state = 1;
-				//}
-				//else
-				//	up_key_state = 0;
-
 				SHORT upKeyState = GetAsyncKeyState(VK_UP);
 
 				if ((1 << 15) & upKeyState)
@@ -1314,22 +1282,6 @@ int _tmain(int argc, _TCHAR* argv[])
 					ndq.write();
 				}
 
-				//if (GetAsyncKeyState(VK_DOWN))
-				//{
-				//	if (!down_key_state)
-				//	{
-				//		flyview_track = false;
-				//		z_track = false;
-				//		manual_track = true;
-				//		ndq.MoveDown();
-				//		ndq.write();
-				//	}
-
-				//	down_key_state = 1;
-				//}
-				//else
-				//	down_key_state = 0;
-					
 				SHORT downKeyState = GetAsyncKeyState(VK_DOWN);
 
 				if ((1 << 15) & downKeyState)

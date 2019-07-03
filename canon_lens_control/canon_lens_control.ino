@@ -25,8 +25,8 @@ const int daqB0     = 5; // DAQ Digital 3
 const int daqB1     = 6; // DAQ Digital 4
 const int daqB2     = 7; // DAQ Digital 5
 
-// Lense position
-int lens_pos = 0;
+// Lens position
+int focal_plane = 0;
 
 // Lens Interface
 const int chipSelectPin = 10;
@@ -206,49 +206,47 @@ void commandLensISR() {
   
   // Send Command
   switch(cmd) {
-    case 0:
-      Serial.write("Move down coarse\n");
-      moveSteps(-(STEP_COARSE + 1));
-      lens_pos -= STEP_COARSE;
-      break;
     case 1:
-      Serial.write("Move up coarse\n");
-      moveSteps(STEP_COARSE);
-      lens_pos += STEP_COARSE;
+      //Serial.write("Move down coarse\n");
+      if ((focal_plane - STEP_COARSE) >= 0)
+      {
+        moveSteps(-(STEP_COARSE + 1));
+        focal_plane -= STEP_COARSE;
+      }
       break;
     case 2:
-      Serial.write("Move down fine\n");
-      moveSteps(-(STEP_FINE + 1));
-      lens_pos -= STEP_FINE;
+      //Serial.write("Move up coarse\n");
+      moveSteps(STEP_COARSE);
+      focal_plane += STEP_COARSE;
       break;
     case 3:
-      Serial.write("Move up fine\n");
-      moveSteps(STEP_FINE);
-      lens_pos += STEP_FINE;
+      //Serial.write("Move down fine\n");
+      if ((focal_plane - STEP_FINE) >= 0)
+      {
+        moveSteps(-(STEP_FINE + 1));
+        focal_plane -= STEP_FINE;
+      }
       break;
     case 4:
-      Serial.write("Move min\n");
-      moveMin();
-      lens_pos = 0;
+      //Serial.write("Move up fine\n");
+      moveSteps(STEP_FINE);
+      focal_plane += STEP_FINE;
       break;
     case 5:
-      Serial.write("Move max\n");
-      moveMax();
-      lens_pos = 0;
-      //lens_pos += STEP_FINE;      
+      //Serial.write("Move min\n");
+      moveMin();
+      focal_plane = 9999;
       break;
     case 6:
-      //Serial.write("Query z position\n");
-      serial_buffer[1] = lens_pos & 0xFF;
-      serial_buffer[0] = (lens_pos >> 8) & 0xFF;
-      Serial.write(serial_buffer,sizeof(serial_buffer));
+      //Serial.write("Move max\n");
+      moveMax(); // Max lens position -> lowest focal position w +z towards lens
+      focal_plane = 0; 
       break;
     case 7:
       //Serial.write("Query z position\n");
-      serial_buffer[1] = lens_pos & 0xFF;
-      serial_buffer[0] = (lens_pos >> 8) & 0xFF;
-      Serial.print(lens_pos);
-      Serial.print("\n");
+      serial_buffer[0] = focal_plane & 0xFF;
+      serial_buffer[1] = (focal_plane >> 8) & 0xFF;
+      Serial.write(serial_buffer,sizeof(serial_buffer));
       break;
   }
 }

@@ -98,62 +98,53 @@ void Daq::lensCommand(int cmd)
 	switch (cmd) 
 	{
 
-		// Move -Z_STEP_COARSE Steps
-	case 0:
-		dataDig[ifB2] = 0;
-		dataDig[ifB1] = 0;
-		dataDig[ifB0] = 0;
-
-		break;
-		// Move +Z_STEP_COARSE Steps
+	// Move -Z_STEP_COARSE Steps
 	case 1:
 		dataDig[ifB2] = 0;
 		dataDig[ifB1] = 0;
 		dataDig[ifB0] = 1;
-
 		break;
-		// Move -Z_STEP_FINE Steps
+
+	// Move +Z_STEP_COARSE Steps
 	case 2:
 		dataDig[ifB2] = 0;
 		dataDig[ifB1] = 1;
 		dataDig[ifB0] = 0;
-
 		break;
-		// Move +Z_STEP_FINE Steps
+
+	// Move -Z_STEP_FINE Steps
 	case 3:
 		dataDig[ifB2] = 0;
 		dataDig[ifB1] = 1;
 		dataDig[ifB0] = 1;
-
 		break;
-		// Move to Min
+
+	// Move +Z_STEP_FINE Steps
 	case 4:
 		dataDig[ifB2] = 1;
 		dataDig[ifB1] = 0;
 		dataDig[ifB0] = 0;
-
 		break;
-		// Move to Max
+
+	// Move to Min
 	case 5:
 		dataDig[ifB2] = 1;
 		dataDig[ifB1] = 0;
 		dataDig[ifB0] = 1;
-
 		break;
-		// Query lens position over serial
+
+	// Move to Max
 	case 6:
 		dataDig[ifB2] = 1;
 		dataDig[ifB1] = 1;
 		dataDig[ifB0] = 0;
-
 		break;
 
-		// Empty Command
+	// Query lens position over serial
 	case 7:
 		dataDig[ifB2] = 1;
 		dataDig[ifB1] = 1;
 		dataDig[ifB0] = 1;
-
 		break;
 	}
 
