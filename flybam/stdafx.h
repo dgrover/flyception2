@@ -67,8 +67,8 @@
 #define MAX_MARKER_SIZE 500
 #define NBEADS 3
 
-#define Z_PERIOD 100
-#define Z_EPSILON 5.0
+#define Z_PERIOD 500
+#define Z_EPSILON 10.0
 #define Z_STEP_COARSE 10.0
 #define Z_STEP_FINE 5.0
 
