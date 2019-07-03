@@ -115,6 +115,9 @@ int _tmain(int argc, _TCHAR* argv[])
 	if (SP->IsConnected())
 	{
 		printf("Connecting lens controller arduino [OK]\n");
+		while (SP->ReadData(serial_buffer, 2) != -1)
+		{
+		}
 
 		// Query for lens position
 		ndq.lensCommand(7);
@@ -122,9 +125,9 @@ int _tmain(int argc, _TCHAR* argv[])
 		printf("Reading initial lens position from Arduino ");
 		Sleep(2000);
 
-		if (SP->ReadData(serial_buffer, 2))
+		if (SP->ReadData(serial_buffer, 2) != -1)
 		{
-			lens_pos = (int16)*serial_buffer;
+			lens_pos = (serial_buffer[1] & 0xFF) << 8 | (serial_buffer[0] & 0xFF);
 			printf("%d [OK]\n", lens_pos);
 		}
 		else
@@ -135,7 +138,6 @@ int _tmain(int argc, _TCHAR* argv[])
 	}
 	else
 		printf("Failed connecting to arduino over serial\n");
-
 
 	configFilename = "..\\ccf\\P_GZL-CL-20C5M_Gazelle_240x240.ccf";
 	//configFilename = "..\\ccf\\P_GZL-CL-20C5M_Gazelle_256x256.ccf";
