@@ -28,6 +28,9 @@ int AVFmfWriter::Open()
 	sprintf_s(ftrajname, "D:\\av-traj-%d%02d%02dT%02d%02d%02d.txt", st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
 	remove(ftrajname);
 
+	sprintf_s(fbgname, "D:\\av-bg-%d%02d%02dT%02d%02d%02d.bmp", st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
+	remove(fbgname);
+
 	fopen_s(&fp, fname, "wb");
 
 	if(fp == NULL) // Cannot open File
@@ -118,14 +121,21 @@ void AVFmfWriter::WriteLog(TimeStamp st)
 	fprintf(flog, "Frame %d - TimeStamp %d %d %d\n", nframes, st.cycleSeconds, st.cycleCount, st.cycleOffset);
 }
 
-void AVFmfWriter::WriteTraj(vector<Point2f> pt)
+void AVFmfWriter::WriteTraj(vector<Point2f> pt, vector<double> sz)
 {
 	fprintf(ftraj, "%d ", nframes);
 
 	for (int i = 0; i < NFLIES; i++)
-		fprintf(ftraj, "%f %f ", pt[i].x, pt[i].y);
+	{
+		fprintf(ftraj, "%f %f %f ", pt[i].x, pt[i].y, sz[i]);
+	}
 
 	fprintf(ftraj, "\n");
+}
+
+void AVFmfWriter::WriteBG(Mat bg)
+{
+	imwrite(fbgname, bg);
 }
 
 int AVFmfWriter::IsOpen()
