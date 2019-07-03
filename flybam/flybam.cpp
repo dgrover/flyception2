@@ -26,6 +26,7 @@ struct fvwritedata
 	Point2f laser;
 	Point2f head;
 	Point2f galvo_angle;
+	int lens_pos;
 };
 
 struct avwritedata
@@ -33,6 +34,7 @@ struct avwritedata
 	Mat img;
 	TimeStamp stamp;
 	vector<Point2f> pts;
+	vector<double> szs;
 };
 
 concurrent_queue<Mat> q;
@@ -46,6 +48,9 @@ concurrent_queue<avwritedata> avwdata;
 
 Mat frame;
 int stamp;
+
+int lens_pos = 0;
+char serial_buffer[2] = { 0 };
 
 static void AcqCallback(SapXferCallbackInfo *pInfo)
 {
@@ -81,19 +86,7 @@ void OnImageGrabbed(Image* pImage, const void* pCallbackData)
 
 int _tmain(int argc, _TCHAR* argv[])
 {
-	// init arduino for camera lens control
-	Serial* SP = new Serial("COM4");    // adjust as needed
-
-	if (SP->IsConnected())
-		printf("Connecting lens controller arduino [OK]\n");
-
-	printf("Sending lens sync command [OK]\n");
-
-	// sending 'S' to sync lens twice
-	SP->WriteData("S", 1);
-	Sleep(1000);
-	SP->WriteData("S", 1);
-	Sleep(1000);
+	
 
 	// initialize camera link gazelle camera
 	SapAcquisition	*Acq	 = NULL;
@@ -107,8 +100,45 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	acqServerName = "Xcelera-CL_PX4_1";
 	acqDeviceNumber = 0;
-	//configFilename = "..\\ccf\\P_GZL-CL-20C5M_Gazelle_240x240.ccf";
-	configFilename = "..\\ccf\\P_GZL-CL-20C5M_Gazelle_256x256.ccf";
+	
+	//configure and start NIDAQ
+	Daq ndq;
+	ndq.configure();
+	ndq.start();
+	ndq.write();
+
+	ndq.startTrigger();
+
+	// init arduino for camera lens control
+	Serial* SP = new Serial("COM4");    // adjust as needed
+
+	if (SP->IsConnected())
+	{
+		printf("Connecting lens controller arduino [OK]\n");
+
+		// Query for lens position
+		ndq.lensCommand(7);
+
+		printf("Reading initial lens position from Arduino ");
+		Sleep(2000);
+
+		if (SP->ReadData(serial_buffer, 2))
+		{
+			lens_pos = (int16)*serial_buffer;
+			printf("%d [OK]\n", lens_pos);
+		}
+		else
+			printf("Read failed\n");
+
+		// Shutdown Serial
+		SP->~Serial();
+	}
+	else
+		printf("Failed connecting to arduino over serial\n");
+
+
+	configFilename = "..\\ccf\\P_GZL-CL-20C5M_Gazelle_240x240.ccf";
+	//configFilename = "..\\ccf\\P_GZL-CL-20C5M_Gazelle_256x256.ccf";
 	
 	printf("Initializing camera link fly view camera ");
 
@@ -146,10 +176,10 @@ int _tmain(int argc, _TCHAR* argv[])
 	int arena_image_width = 512, arena_image_height = 512;
 	int arena_image_left = 384, arena_image_top = 256;
 
-	//int fly_image_width = 240, fly_image_height = 240;
-	int fly_image_width = 256, fly_image_height = 256;
+	int fly_image_width = 240, fly_image_height = 240;
+	//int fly_image_width = 256, fly_image_height = 256;
 
-	Point el_center(260, 227);
+	Point el_center(260, 220);
 	int el_maj_axis = 237, el_min_axis = 133;
 	int el_angle = 178;
 
@@ -179,7 +209,6 @@ int _tmain(int argc, _TCHAR* argv[])
 	FVFmfWriter fvfout;
 	AVFmfWriter avfout;
 
-	vector<Point2f> pt(NFLIES);
 	vector<Point2f> arena_pt(NFLIES);
 
 	fvwritedata fvin;
@@ -201,10 +230,10 @@ int _tmain(int argc, _TCHAR* argv[])
 	error = arena_cam.SetTrigger();
 	
 	//shutter setting for 0.1A power
-	//error = arena_cam.SetProperty(SHUTTER, 3.002);
+	error = arena_cam.SetProperty(SHUTTER, 3.002);
 	
 	//shutter setting for 0.75A power
-	error = arena_cam.SetProperty(SHUTTER, 0.249);
+	//error = arena_cam.SetProperty(SHUTTER, 0.249);
 	
 	error = arena_cam.SetProperty(GAIN, 0.0);
 	error = arena_cam.cam.StartCapture(OnImageGrabbed);
@@ -216,14 +245,6 @@ int _tmain(int argc, _TCHAR* argv[])
 	}
 	printf("[OK]\n");
 
-	//configure and start NIDAQ
-	Daq ndq;
-	ndq.configure();
-	ndq.start();
-	ndq.write();
-
-	ndq.startTrigger();
-
 	//create arena mask
 	Mat outer_mask = Mat::zeros(Size(arena_image_width, arena_image_height), CV_8UC1);
 	ellipse(outer_mask, el_center, Size(el_maj_axis, el_min_axis), el_angle, 0, 360, Scalar(255, 255, 255), FILLED);
@@ -234,12 +255,12 @@ int _tmain(int argc, _TCHAR* argv[])
 	Mat arena_mean = Mat::zeros(arena_image_width, arena_image_height, CV_32F);
 
 	// thresholds for fly-view image at 0.1A power
-	//int arena_thresh = 65;
-	//int fly_thresh = 150;
+	int arena_thresh = 65;
+	int fly_thresh = 150;
 
 	// thresholds for fly-view image at 0.75A power
-	int arena_thresh = 45;
-	int fly_thresh = 175;
+	//int arena_thresh = 45;
+	//int fly_thresh = 175;
 
 	int fly_erode = 0;
 	int fly_dilate = 3;
@@ -296,6 +317,8 @@ int _tmain(int argc, _TCHAR* argv[])
 
 						erode(fly_fg, fly_mask, fly_element, Point(-1, -1), fly_erode);
 						dilate(fly_mask, fly_mask, fly_element, Point(-1, -1), fly_dilate);
+
+						//double fm = varianceOfLaplacian(fly_frame);
 
 						if (flyview_track)
 						{
@@ -530,14 +553,16 @@ int _tmain(int argc, _TCHAR* argv[])
 							}
 						}
 
+						putText(fly_frame, to_string(lens_pos), Point(0, 10), FONT_HERSHEY_COMPLEX, 0.4, Scalar(255, 255, 255));
+
 						putText(fly_frame, to_string((int)fly_fps), Point((fly_image_width - 50), 10), FONT_HERSHEY_COMPLEX, 0.4, Scalar(255, 255, 255));
 						putText(fly_frame, to_string(q.unsafe_size()), Point((fly_image_width - 50), 20), FONT_HERSHEY_COMPLEX, 0.4, Scalar(255, 255, 255));
-
+						
 						if (manual_track)
 							drawMarker(fly_frame, Point2f(fly_image_width/2, fly_image_height/2), Scalar(255, 255, 255), MARKER_CROSS, 20, 1);
 
 						if (flyview_record)
-							putText(fly_frame, to_string(fvrcount), Point(0, 10), FONT_HERSHEY_COMPLEX, 0.4, Scalar(255, 255, 255));
+							putText(fly_frame, to_string(fvrcount), Point(0, 20), FONT_HERSHEY_COMPLEX, 0.4, Scalar(255, 255, 255));
 
 						flyDispStream.try_enqueue(fly_frame.clone());
 						flyMaskStream.try_enqueue(fly_mask.clone());
@@ -549,6 +574,7 @@ int _tmain(int argc, _TCHAR* argv[])
 							fvin.head = pt2d;
 							fvin.laser = wpt;
 							fvin.galvo_angle = galvo_mirror_angle;
+							fvin.lens_pos = lens_pos;
 
 							fvwdata.push(fvin);
 							fvrcount++;
@@ -573,6 +599,9 @@ int _tmain(int argc, _TCHAR* argv[])
 			{
 				if (aq.try_pop(img))
 				{
+					vector<Point2f> fly_pt(NFLIES);
+					vector<double> fly_sz(NFLIES);
+					
 					arena_fps = ConvertTimeToFPS(img.GetTimeStamp().cycleCount, arena_last);
 					arena_last = img.GetTimeStamp().cycleCount;
 
@@ -607,8 +636,10 @@ int _tmain(int argc, _TCHAR* argv[])
 						// Get the moments and mass centers
 						vector<Moments> arena_mu(arena_contours.size());
 						vector<Point2f> arena_mc(arena_contours.size());
+						vector<double> arena_sz(arena_contours.size());
 
 						vector<Point2f> arena_ctr_pts;
+						vector<double> arena_ctr_sz;
 
 						for (int i = 0; i < arena_contours.size(); i++)
 						{
@@ -616,13 +647,14 @@ int _tmain(int argc, _TCHAR* argv[])
 							arena_mu[i] = moments(arena_contours[i], false);
 							arena_mc[i] = Point2f(arena_mu[i].m10 / arena_mu[i].m00, arena_mu[i].m01 / arena_mu[i].m00);
 
-							double csize = contourArea(arena_contours[i]);
+							arena_sz[i] = contourArea(arena_contours[i]);
 
-							if (csize > 10)
+							if (arena_sz[i] > 10)
 							{
 								//drawContours(arena_frame, arena_contours, i, Scalar(255, 255, 255), 1, 8, vector<Vec4i>(), 0, Point());
 								drawContours(arena_mask, arena_contours, i, Scalar(255, 255, 255), FILLED, 1);
 								arena_ctr_pts.push_back(arena_mc[i]);
+								arena_ctr_sz.push_back(arena_sz[i]);
 							}
 						}
 
@@ -633,11 +665,14 @@ int _tmain(int argc, _TCHAR* argv[])
 								int j = findClosestPoint(arena_pt[i], arena_ctr_pts);
 
 								arena_pt[i] = arena_ctr_pts[j];
-								pt[i] = arena_pt[i];
+								
+								fly_pt[i] = arena_pt[i];
+								fly_sz[i] = arena_ctr_sz[j];
 
 								putText(arena_frame, to_string(i), arena_pt[i], FONT_HERSHEY_COMPLEX, 0.2, Scalar(255, 255, 255));
 
 								arena_ctr_pts.erase(arena_ctr_pts.begin() + j);
+								arena_ctr_sz.erase(arena_ctr_sz.begin() + j);
 							}
 						}
 						else if (arena_ctr_pts.size() < NFLIES)
@@ -653,8 +688,11 @@ int _tmain(int argc, _TCHAR* argv[])
 								int j = findClosestPoint(arena_ctr_pts[i], last_arena_pt);
 
 								arena_pt[arena_pt_ind[j]] = arena_ctr_pts[i];
-								pt[arena_pt_ind[j]] = arena_pt[arena_pt_ind[j]];
 								
+								fly_pt[arena_pt_ind[j]] = arena_pt[arena_pt_ind[j]];
+								fly_sz[arena_pt_ind[j]] = arena_ctr_sz[i];
+
+
 								putText(arena_frame, to_string(arena_pt_ind[j]), arena_pt[arena_pt_ind[j]], FONT_HERSHEY_COMPLEX, 0.2, Scalar(255, 255, 255));
 
 								last_arena_pt.erase(last_arena_pt.begin() + j);
@@ -664,7 +702,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 						if (!flyview_track && !manual_track)
 						{
-							int j = findClosestPoint(pt[focal_fly], raster_pts);
+							int j = findClosestPoint(arena_pt[focal_fly], raster_pts);
 							ndq.SetGalvoAngles(raster_angles[j]);
 							ndq.write();
 						}
@@ -683,7 +721,8 @@ int _tmain(int argc, _TCHAR* argv[])
 					{
 						avin.img = arena_img;
 						avin.stamp = img.GetTimeStamp();
-						avin.pts = pt;
+						avin.pts = fly_pt;
+						avin.szs = fly_sz;
 
 						avwdata.push(avin);
 
@@ -716,7 +755,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 					fvfout.WriteFrame(out.img);
 					fvfout.WriteLog(out.stamp);
-					fvfout.WriteTraj(out.laser, out.head, out.galvo_angle);
+					fvfout.WriteTraj(out.laser, out.head, out.galvo_angle, out.lens_pos);
 					
 					fvfout.nframes++;
 				}
@@ -748,11 +787,12 @@ int _tmain(int argc, _TCHAR* argv[])
 						avfout.Open();
 						avfout.InitHeader(arena_image_width, arena_image_height);
 						avfout.WriteHeader();
+						avfout.WriteBG(arena_bg);
 					}
 
 					avfout.WriteFrame(out.img);
 					avfout.WriteLog(out.stamp);
-					avfout.WriteTraj(out.pts);
+					avfout.WriteTraj(out.pts, out.szs);
 					avfout.nframes++;
 				}
 				else
@@ -853,7 +893,14 @@ int _tmain(int argc, _TCHAR* argv[])
 				if (GetAsyncKeyState(VK_NUMPAD1))
 				{
 					if (!inc_foc_state)
-						SP->WriteData("1", 1);
+					{
+						if ((lens_pos - Z_STEP) >= 0)
+						{
+							lens_pos -= Z_STEP;
+							ndq.lensCommand(1); // 1: Move step (coarse) toward max lens position -> move focal plane toward camera
+						}
+					}
+
 					inc_foc_state = 1;
 				}
 				else
@@ -861,50 +908,46 @@ int _tmain(int argc, _TCHAR* argv[])
 
 				if (GetAsyncKeyState(VK_NUMPAD2))
 				{
-					if (!dec_foc_state)
-						SP->WriteData("!", 1);
+					if (!dec_foc_state) 
+					{
+						ndq.lensCommand(2); // 2: Move step (coarse) toward min lens position -> move focal plane toward backlight
+						lens_pos += Z_STEP;
+					}
+					
 					dec_foc_state = 1;
 				}
 				else
 					dec_foc_state = 0;
 
-
+				// Max lens position -> min focal toward camera (-z up)
 				if (GetAsyncKeyState(VK_NUMPAD4))
 				{
 					if (!max_foc_state)
-						SP->WriteData("5", 1);
+					{
+						lens_pos = 0;
+						ndq.lensCommand(6);
+					}
+					
 					max_foc_state = 1;
 				}
 				else
 					max_foc_state = 0;
 
+				// Min lens position -> max focal toward backlight (+z down)
 				if (GetAsyncKeyState(VK_NUMPAD5))
 				{
 					if (!min_foc_state)
-						SP->WriteData("6", 1);
+					{
+						lens_pos = 9999;
+						ndq.lensCommand(5);
+					}
+
 					min_foc_state = 1;
 				}
 				else
 					min_foc_state = 0;
 
-				//if (GetAsyncKeyState(VK_NUMPAD7))
-				//{
-				//	if (!min_inc_foc_state)
-				//		SP->WriteData("0", 1);
-				//	min_inc_foc_state = 1;
-				//}
-				//else
-				//	min_inc_foc_state = 0;
-
-				//if (GetAsyncKeyState(VK_NUMPAD8))
-				//{
-				//	if (!min_dec_foc_state)
-				//		SP->WriteData(")", 1);
-				//	min_dec_foc_state = 1;
-				//}
-				//else
-				//	min_dec_foc_state = 0;
-								
+				
 				if (GetAsyncKeyState(VK_TAB))
 				{
 					if (!fly_key_state)
@@ -925,21 +968,6 @@ int _tmain(int argc, _TCHAR* argv[])
 				else
 					fly_key_state = 0;
 
-
-				//if (GetAsyncKeyState(VK_LEFT))
-				//{
-				//	if (!left_key_state)
-				//	{
-				//		manual_track = true;
-				//		ndq.MoveLeft();
-				//		ndq.write();
-				//	}
-
-				//	left_key_state = 1;
-				//}
-				//else
-				//	left_key_state = 0;
-
 				SHORT leftKeyState = GetAsyncKeyState(VK_LEFT);
 
 				if ((1 << 15) & leftKeyState)
@@ -949,20 +977,6 @@ int _tmain(int argc, _TCHAR* argv[])
 					ndq.MoveLeft();
 					ndq.write();
 				}
-
-				//if (GetAsyncKeyState(VK_RIGHT))
-				//{
-				//	if (!right_key_state)
-				//	{
-				//		manual_track = true;
-				//		ndq.MoveRight();
-				//		ndq.write();
-				//	}
-
-				//	right_key_state = 1;
-				//}
-				//else
-				//	right_key_state = 0;
 
 				SHORT rightKeyState = GetAsyncKeyState(VK_RIGHT);
 
@@ -974,20 +988,6 @@ int _tmain(int argc, _TCHAR* argv[])
 					ndq.write();
 				}
 
-				//if (GetAsyncKeyState(VK_UP))
-				//{
-				//	if (!up_key_state)
-				//	{
-				//		manual_track = true;
-				//		ndq.MoveUp();
-				//		ndq.write();
-				//	}
-
-				//	up_key_state = 1;
-				//}
-				//else
-				//	up_key_state = 0;
-
 				SHORT upKeyState = GetAsyncKeyState(VK_UP);
 
 				if ((1 << 15) & upKeyState)
@@ -998,20 +998,6 @@ int _tmain(int argc, _TCHAR* argv[])
 					ndq.write();
 				}
 
-				//if (GetAsyncKeyState(VK_DOWN))
-				//{
-				//	if (!down_key_state)
-				//	{
-				//		manual_track = true;
-				//		ndq.MoveDown();
-				//		ndq.write();
-				//	}
-
-				//	down_key_state = 1;
-				//}
-				//else
-				//	down_key_state = 0;
-					
 				SHORT downKeyState = GetAsyncKeyState(VK_DOWN);
 
 				if ((1 << 15) & downKeyState)

@@ -1,47 +1,263 @@
 #include <SPI.h>
+/*
+ * Interface Commands (3-bit mode)
+ * 
+ * 000 (0) - Move down coarse step size
+ * 001 (1) - Move up coarse step size
+ * 010 (2) - Move down fine step size
+ * 011 (3) - Move up coarse step size
+ * 100 (4) - Move lense to down to min
+ * 101 (5) - Move lense up to max
+ * 
+ */
+
+// Step size parameters
+#define STEP_FINE          5
+#define STEP_COARSE        10
 
 // xxxset up the speed, data order and data mode
  SPISettings cameraSetting(10000, MSBFIRST, SPI_MODE2);
 
-uint8_t outputByte, inputByte;
+// DAQ Interface
+const int daqToggle = 3; // DAQ Digital 2
+
+const int daqB0     = 5; // DAQ Digital 3
+const int daqB1     = 6; // DAQ Digital 4
+const int daqB2     = 7; // DAQ Digital 5
+
+// Lens position
+int focal_plane = 0;
+
+// Lens Interface
 const int chipSelectPin = 10;
 const int messagePin = 9;
-const int delayTime = 200;
-//int Flash_Reset=6;
-//int Flash_Fire=4;
 
+// Buffer
+uint8_t outputByte, inputByte;
+const int delayTime = 200;
+//const int delayTime = 100;
 int inByte;
+char serial_buffer[2];
 
 void setup() 
 {
 
-  // initialize SPI:
+  // Initialize Lens Interface
   SPI.begin(); 
   SPI.beginTransaction(SPISettings(SPI_CLOCK_DIV128, MSBFIRST, SPI_MODE3));
-  outputByte = 0x55;
-
-  // initalize the chip select pin:
+  //SPI.beginTransaction(SPISettings(SPI_CLOCK_DIV32, MSBFIRST, SPI_MODE3));
   pinMode(chipSelectPin, OUTPUT);
   digitalWrite(chipSelectPin, LOW);
   digitalWrite(messagePin, LOW);
+  outputByte = 0x55;
+  
+  // Initialize DAQ interface
+  pinMode(daqToggle, INPUT);
+  pinMode(daqB2, INPUT);
+  pinMode(daqB1, INPUT);
+  pinMode(daqB0, INPUT);
 
+  // Setup Toggle ISR
+  attachInterrupt(digitalPinToInterrupt(daqToggle), commandLensISR, CHANGE);
+
+  // Initialize USB Serial
   Serial.begin(19200);
 
-  //Flash setup
-  //pinMode(Flash_Reset, OUTPUT);
-  //pinMode(Flash_Fire, OUTPUT);
-  //digitalWrite(Flash_Reset,HIGH);
-  //digitalWrite(Flash_Fire,LOW);
-  //delay(25);
+  // Synchronize Lens
+  syncLens();
+  syncLens();
 
-  //digitalWrite(Flash_Fire,LOW);  //turns on YELLOW LED reset relay
-  //delay(1000);
-  //digitalWrite(Flash_Reset,LOW);  //turns off RED LED
 }
 
-void loop() 
-{
-  //delay(25);
+void loop() {
+  
+  // ISR Service Toggle Pin
+  // Listen for query
+  
+}
+
+void syncLens() {
+  digitalWrite(messagePin, HIGH);
+  
+  digitalWrite(chipSelectPin, HIGH);
+  inputByte = SPI.transfer(0x0A);
+  digitalWrite(chipSelectPin, LOW);
+  delayMicroseconds(delayTime); 
+  
+  digitalWrite(chipSelectPin, HIGH);
+  inputByte = SPI.transfer(0x00);
+  digitalWrite(chipSelectPin, LOW);
+  
+  delayMicroseconds(delayTime);
+  
+  digitalWrite(messagePin, LOW);
+}
+
+void moveSteps(short steps) {
+
+  // Get bytes of steps
+  char b0 = steps & 0xFF;
+  char b1 = (steps >> 8) & 0xFF;
+  //Serial.print(b1,HEX);
+  //Serial.print("\n");
+  //Serial.print(b0,HEX);
+  //Serial.print("\n");
+  digitalWrite(messagePin, HIGH);
+  digitalWrite(chipSelectPin, HIGH);
+  inputByte = SPI.transfer(0x44);
+  digitalWrite(chipSelectPin, LOW);
+  delayMicroseconds(delayTime);
+  
+  // First Byte
+  digitalWrite(chipSelectPin, HIGH);
+  inputByte = SPI.transfer(b1);
+  digitalWrite(chipSelectPin, LOW);
+  delayMicroseconds(delayTime);    
+  // Second Byte
+  digitalWrite(chipSelectPin, HIGH);
+  inputByte = SPI.transfer(b0);
+  digitalWrite(chipSelectPin, LOW);
+  delayMicroseconds(delayTime);
+
+  digitalWrite(chipSelectPin, HIGH);
+  inputByte = SPI.transfer(0x0F);
+  digitalWrite(chipSelectPin, LOW);
+  delayMicroseconds(delayTime);
+  digitalWrite(chipSelectPin, HIGH);
+  inputByte = SPI.transfer(0x0A);
+  digitalWrite(chipSelectPin, LOW);
+  delayMicroseconds(delayTime);
+  digitalWrite(chipSelectPin, HIGH);
+  inputByte = SPI.transfer(0x00);
+  digitalWrite(chipSelectPin, LOW);
+  delayMicroseconds(delayTime);               
+  digitalWrite(messagePin, LOW);     
+
+}
+
+void moveMin() {
+  
+  digitalWrite(messagePin, HIGH);
+  
+  digitalWrite(chipSelectPin, HIGH);
+  inputByte = SPI.transfer(0x05);
+  digitalWrite(chipSelectPin, LOW);
+  delayMicroseconds(delayTime);
+  
+  digitalWrite(chipSelectPin, HIGH);
+  inputByte = SPI.transfer(0x0F);
+  digitalWrite(chipSelectPin, LOW);
+  delayMicroseconds(delayTime);    
+  
+  digitalWrite(chipSelectPin, HIGH);
+  inputByte = SPI.transfer(0x00);
+  digitalWrite(chipSelectPin, LOW);
+  delayMicroseconds(delayTime);
+  
+  digitalWrite(messagePin, LOW);
+  
+}
+
+void moveMax() {
+  
+     digitalWrite(messagePin, HIGH);
+
+    digitalWrite(chipSelectPin, HIGH);
+    inputByte = SPI.transfer(0x06);
+    digitalWrite(chipSelectPin, LOW);
+    delayMicroseconds(delayTime);
+    
+    digitalWrite(chipSelectPin, HIGH);
+    inputByte = SPI.transfer(0x0F);
+    digitalWrite(chipSelectPin, LOW);
+    delayMicroseconds(delayTime);    
+
+    digitalWrite(chipSelectPin, HIGH);
+    inputByte = SPI.transfer(0x00);
+    digitalWrite(chipSelectPin, LOW);
+    delayMicroseconds(delayTime);
+
+    digitalWrite(messagePin, LOW);
+}
+
+
+
+/*
+ * Interface Commands (3-bit mode)
+ * 
+ * 000 (0) - Move down coarse step size
+ * 001 (1) - Move up coarse step size
+ * 010 (2) - Move down fine step size
+ * 011 (3) - Move up coarse step size
+ * 100 (4) - Move lense to down to min
+ * 101 (5) - Move lense up to max
+ * 
+ */
+
+void commandLensISR() {
+
+  // Read Interface
+  int cmd = (PIND & B11100000) >> 5;
+  
+  //Serial.print(cmd,BIN);
+  //Serial.print('\n');
+  // Synchronize Lens
+  syncLens();
+  
+  // Send Command
+  switch(cmd) {
+    case 1:
+      //Serial.write("Move down coarse\n");
+      if ((focal_plane - STEP_COARSE) >= 0)
+      {
+        moveSteps(-(STEP_COARSE + 1));
+        focal_plane -= STEP_COARSE;
+      }
+      break;
+    case 2:
+      //Serial.write("Move up coarse\n");
+      moveSteps(STEP_COARSE);
+      focal_plane += STEP_COARSE;
+      break;
+    case 3:
+      //Serial.write("Move down fine\n");
+      if ((focal_plane - STEP_FINE) >= 0)
+      {
+        moveSteps(-(STEP_FINE + 1));
+        focal_plane -= STEP_FINE;
+      }
+      break;
+    case 4:
+      //Serial.write("Move up fine\n");
+      moveSteps(STEP_FINE);
+      focal_plane += STEP_FINE;
+      break;
+    case 5:
+      //Serial.write("Move min\n");
+      moveMin();
+      focal_plane = 9999;
+      break;
+    case 6:
+      //Serial.write("Move max\n");
+      moveMax(); // Max lens position -> lowest focal position w +z towards lens
+      focal_plane = 0; 
+      break;
+    case 7:
+      //Serial.write("Query z position\n");
+      serial_buffer[0] = focal_plane & 0xFF;
+      serial_buffer[1] = (focal_plane >> 8) & 0xFF;
+      Serial.write(serial_buffer,sizeof(serial_buffer));
+      break;
+  }
+}
+
+
+
+/*****************************************************
+ *  Old Loop Code and other camera commands
+ */
+void commands() {
+    //delay(25);
   
   // put your main code here, to run repeatedly:
   if (Serial.available() > 0) {
@@ -866,3 +1082,4 @@ void loop()
   } // end if
   //delay(1000);  
 }
+

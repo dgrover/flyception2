@@ -15,6 +15,7 @@ class AVFmfWriter
 		char fname[100];
 		char flogname[100];
 		char ftrajname[100];
+		char fbgname[100];
 
 		unsigned __int32 fmfVersion, SizeY, SizeX;
 		unsigned __int64 bytesPerChunk;
@@ -34,7 +35,8 @@ class AVFmfWriter
 		void WriteFrame(Image img);
 		void WriteFrame(Mat img);
 		void WriteLog(TimeStamp st);
-		void WriteTraj(vector<Point2f> pt);
+		void WriteTraj(vector<Point2f> pt, vector<double> sz);
+		void WriteBG(cv::Mat bg);
 		int IsOpen();
 		
 };
