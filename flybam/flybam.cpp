@@ -129,19 +129,18 @@ int _tmain(int argc, _TCHAR* argv[])
 		// Query for lens position
 		ndq.lensCommand(7);
 
-		printf("Reading initial lens position from Arduino...\n");
+		printf("Reading initial lens position from Arduino ");
 		Sleep(2000);
 
 		if (SP->ReadData(serial_buffer, 2))
 		{
 			lens_pos = (int16)*serial_buffer;
-			printf("Inital Lens Position: %d\n", lens_pos);
+			printf("%d [OK]\n", lens_pos);
 		}
 		else
 			printf("Read failed\n");
 
 		// Shutdown Serial
-		//printf("Closing serial connection...\n");
 		SP->~Serial();
 	}
 	else
