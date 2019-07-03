@@ -12,8 +12,8 @@
  */
 
 // Step size parameters
-#define STEP_FINE          5
-#define STEP_COARSE        10
+int STEP_FINE = 5;
+int STEP_COARSE = 10;
 
 // xxxset up the speed, data order and data mode
  SPISettings cameraSetting(10000, MSBFIRST, SPI_MODE2);
@@ -65,8 +65,11 @@ void setup()
 
   // Synchronize Lens
   syncLens();
+  delay(2000);
   syncLens();
 
+  moveMax(); 
+  focal_plane = 0;
 }
 
 void loop() {
@@ -93,7 +96,7 @@ void syncLens() {
   digitalWrite(messagePin, LOW);
 }
 
-void moveSteps(short steps) {
+void moveSteps(int steps) {
 
   // Get bytes of steps
   char b0 = steps & 0xFF;
@@ -202,45 +205,50 @@ void commandLensISR() {
   //Serial.print(cmd,BIN);
   //Serial.print('\n');
   // Synchronize Lens
-  syncLens();
+  //syncLens();
   
   // Send Command
   switch(cmd) {
+    case 0:
+      syncLens();
+      delay(2000);
+      syncLens();
+      break;
     case 1:
       //Serial.write("Move down coarse\n");
       if ((focal_plane - STEP_COARSE) >= 0)
       {
+        focal_plane = focal_plane - STEP_COARSE;
         moveSteps(-(STEP_COARSE + 1));
-        focal_plane -= STEP_COARSE;
       }
       break;
     case 2:
       //Serial.write("Move up coarse\n");
+      focal_plane = focal_plane + STEP_COARSE;
       moveSteps(STEP_COARSE);
-      focal_plane += STEP_COARSE;
       break;
     case 3:
       //Serial.write("Move down fine\n");
       if ((focal_plane - STEP_FINE) >= 0)
       {
+        focal_plane = focal_plane - STEP_FINE;        
         moveSteps(-(STEP_FINE + 1));
-        focal_plane -= STEP_FINE;
       }
       break;
     case 4:
       //Serial.write("Move up fine\n");
+      focal_plane = focal_plane + STEP_FINE;      
       moveSteps(STEP_FINE);
-      focal_plane += STEP_FINE;
       break;
     case 5:
       //Serial.write("Move min\n");
-      moveMin();
       focal_plane = 9999;
+      moveMin();
       break;
     case 6:
       //Serial.write("Move max\n");
-      moveMax(); // Max lens position -> lowest focal position w +z towards lens
       focal_plane = 0; 
+      moveMax(); // Max lens position -> lowest focal position w +z towards lens
       break;
     case 7:
       //Serial.write("Query z position\n");
