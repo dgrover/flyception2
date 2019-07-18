@@ -219,7 +219,7 @@ void commandLensISR() {
       if ((focal_plane - STEP_COARSE) >= 0)
       {
         focal_plane = focal_plane - STEP_COARSE;
-        moveSteps(-(STEP_COARSE + 1));
+        moveSteps(-STEP_COARSE);
       }
       break;
     case 2:
@@ -232,7 +232,7 @@ void commandLensISR() {
       if ((focal_plane - STEP_FINE) >= 0)
       {
         focal_plane = focal_plane - STEP_FINE;        
-        moveSteps(-(STEP_FINE + 1));
+        moveSteps(-STEP_FINE);
       }
       break;
     case 4:
