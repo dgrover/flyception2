@@ -140,7 +140,14 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	Mat arena_element = getStructuringElement(MORPH_RECT, Size(3, 3), Point(1, 1));
 
-	vector<Point2f> arena_pt(NFLIES);
+	vector<vector<Point2f>> all_pts;
+	vector<vector<double>> all_szs;
+	vector<bool> swap(nframes);
+
+	all_pts.resize(nframes, vector<Point2f>(NFLIES));
+	all_szs.resize(nframes, vector<double>(NFLIES));
+
+	//vector<Point2f> arena_pt(NFLIES);
 	
 	// old videos before laser re-alignment
 	//Point el_center(260, 227);
@@ -155,13 +162,23 @@ int _tmain(int argc, _TCHAR* argv[])
 	bool fly_lost = false;
 	float fly_dist = 0;
 
+	int delay = 1;
+
 	Mat outer_mask = Mat::zeros(Size(imageWidth, imageWidth), CV_8UC1);
 	ellipse(outer_mask, el_center, Size(el_maj_axis, el_min_axis), el_angle, 0, 360, Scalar(255, 255, 255), FILLED);
 
-	for (int imageCount = 0; imageCount < nframes; imageCount++)
+	bool stream = true;
+	int imageCount = 0;
+
+	while (true)
 	{
 		vector<Point2f> fly_pt(NFLIES);
 		vector<double> fly_sz(NFLIES);
+
+		vector<Point2f> arena_pt(NFLIES);
+		
+		if (imageCount > 0)
+			arena_pt = all_pts[imageCount - 1];
 		
 		arena_frame = fin.ReadFrame(imageCount);
 
@@ -252,7 +269,7 @@ int _tmain(int argc, _TCHAR* argv[])
 						fly_sz[arena_pt_ind[j]] = arena_ctr_sz[i];
 
 
-						putText(arena_frame, to_string(arena_pt_ind[j]), arena_pt[arena_pt_ind[j]], FONT_HERSHEY_COMPLEX, 0.2, Scalar(255, 255, 255));
+						//putText(arena_frame, to_string(arena_pt_ind[j]), arena_pt[arena_pt_ind[j]], FONT_HERSHEY_COMPLEX, 0.2, Scalar(255, 255, 255));
 
 						last_arena_pt.erase(last_arena_pt.begin() + j);
 						arena_pt_ind.erase(arena_pt_ind.begin() + j);
@@ -295,7 +312,7 @@ int _tmain(int argc, _TCHAR* argv[])
 						fly_pt[i] = arena_pt[i];
 						fly_sz[i] = cluster_ctr_sz[j];
 
-						putText(arena_frame, to_string(i), arena_pt[i], FONT_HERSHEY_COMPLEX, 0.2, Scalar(255, 255, 255));
+						//putText(arena_frame, to_string(i), arena_pt[i], FONT_HERSHEY_COMPLEX, 0.2, Scalar(255, 255, 255));
 
 						cluster_ctr_pts.erase(cluster_ctr_pts.begin() + j);
 						cluster_ctr_sz.erase(cluster_ctr_sz.begin() + j);
@@ -303,74 +320,105 @@ int _tmain(int argc, _TCHAR* argv[])
 				}
 			}
 
+			if (swap[imageCount])
+			{
+				if (NFLIES == 2)
+				{
+					Point2f tpt = fly_pt[0];
+					fly_pt[0] = fly_pt[1];
+					fly_pt[1] = tpt;
+
+					double tsz = fly_sz[0];
+					fly_sz[0] = fly_sz[1];
+					fly_sz[1] = tsz;
+				}
+			}
+
+
 			fly_dist = dist(fly_pt[0], fly_pt[1]);
 			fly_lost = false;
-
-			//if (arena_ctr_pts.size() >= NFLIES)
-			//{
-			//	for (int i = 0; i < NFLIES; i++)
-			//	{
-			//		int j = findClosestPoint(arena_pt[i], arena_ctr_pts);
-
-			//		arena_pt[i] = arena_ctr_pts[j];
-
-			//		fly_pt[i] = arena_pt[i];
-			//		fly_sz[i] = arena_ctr_sz[j];
-
-			//		putText(arena_frame, to_string(i), arena_pt[i], FONT_HERSHEY_COMPLEX, 0.2, Scalar(255, 255, 255));
-
-			//		arena_ctr_pts.erase(arena_ctr_pts.begin() + j);
-			//		arena_ctr_sz.erase(arena_ctr_sz.begin() + j);
-			//	}
-			//}
-			//else if (arena_ctr_pts.size() < NFLIES)
-			//{
-			//	vector<Point2f> last_arena_pt = arena_pt;
-			//	vector<int> arena_pt_ind;
-
-			//	for (int i = 0; i < NFLIES; i++)
-			//		arena_pt_ind.push_back(i);
-
-			//	for (int i = 0; i < arena_ctr_pts.size(); i++)
-			//	{
-			//		int j = findClosestPoint(arena_ctr_pts[i], last_arena_pt);
-
-			//		arena_pt[arena_pt_ind[j]] = arena_ctr_pts[i];
-
-			//		fly_pt[arena_pt_ind[j]] = arena_pt[arena_pt_ind[j]];
-			//		fly_sz[arena_pt_ind[j]] = arena_ctr_sz[i];
-
-
-			//		putText(arena_frame, to_string(arena_pt_ind[j]), arena_pt[arena_pt_ind[j]], FONT_HERSHEY_COMPLEX, 0.2, Scalar(255, 255, 255));
-
-			//		last_arena_pt.erase(last_arena_pt.begin() + j);
-			//		arena_pt_ind.erase(arena_pt_ind.begin() + j);
-			//	}
-			//}
 		}
-
-		fprintf(fout, "%d ", imageCount);
 
 		for (int i = 0; i < NFLIES; i++)
 		{
-			fprintf(fout, "%f %f %f ", fly_pt[i].x, fly_pt[i].y, fly_sz[i]);
+			putText(arena_frame, to_string(i), fly_pt[i], FONT_HERSHEY_COMPLEX, 0.2, Scalar(255, 255, 255));
+
+			all_pts[imageCount][i] = fly_pt[i];
+			all_szs[imageCount][i] = fly_sz[i];
+
 			//printf("%f %f %f ", fly_pt[i].x, fly_pt[i].y, fly_sz[i]);
 		}
-
-		fprintf(fout, "\n");
-		//printf("\n");
 
 		putText(arena_frame, to_string(imageCount), Point((imageWidth - 50), 10), FONT_HERSHEY_COMPLEX, 0.4, Scalar(255, 255, 255));
 		ellipse(arena_frame, el_center, Size(el_maj_axis, el_min_axis), el_angle, 0, 360, Scalar(255, 255, 255));
 
 		imshow("Raw", arena_frame);
-		//imshow("Background", arena_bg);
 		imshow("Mask", arena_mask);
+		//imshow("Background", arena_bg);
 
-		char ch = waitKey(1);
+		int ch = waitKey(delay);
+
+		if (ch == 's')
+		{
+			if (NFLIES == 2)
+			{
+				if (swap[imageCount])
+					swap[imageCount] = 0;
+				else
+					swap[imageCount] = 1;
+			}
+		}
+
+		if (ch == 32)
+		{
+			stream = !stream;
+			delay = stream;
+		}
+
+		if (ch == 'a')
+		{
+			stream = false;
+			delay = 0;
+
+			if (imageCount > 0)
+				imageCount--;
+		}
+
+		if (ch == 'd')
+		{
+			stream = false;
+			delay = 0;
+			
+			if (imageCount < (nframes - 1))
+				imageCount++;
+		}
+
 
 		if (ch == 27)
 			break;
+
+		if (stream)
+		{
+			if (imageCount < (nframes - 1))
+				imageCount++;
+			else
+				stream = false;
+		}
+	}
+
+
+	for (imageCount = 0; imageCount < nframes; imageCount++)
+	{
+		fprintf(fout, "%d ", imageCount);
+
+		for (int i = 0; i < NFLIES; i++)
+		{
+			fprintf(fout, "%f %f %f ", all_pts[imageCount][i].x, all_pts[imageCount][i].y, all_szs[imageCount][i]);
+			//printf("%f %f %f ", fly_pt[i].x, fly_pt[i].y, fly_sz[i]);
+		}
+
+		fprintf(fout, "\n");
+		//printf("\n");
 	}
 
 	fin.Close();
