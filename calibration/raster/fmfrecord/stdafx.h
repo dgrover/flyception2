@@ -34,7 +34,7 @@
 #define YVOLTPERDEGREE 0.525
 
 #define XOFFSET -0.25		// x-offset for centering galvo to target (in volts)
-#define YOFFSET -0.65		// y-offset for centering galvo to target (in volts)
+#define YOFFSET -0.315		// y-offset for centering galvo to target (in volts)
 
 #define MIN_ANGLE -9.0
 #define MAX_ANGLE 9.0
