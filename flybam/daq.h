@@ -34,7 +34,7 @@ public:
 	void write();
 	void flashHigh();
 	void flashLow();
-	void ConvertPtToDeg(Point2f pt);
+	//void ConvertPtToDeg(Point2f pt);
 	void ConvertPixelToDeg(float x, float y);
 	Point2f ConvertDegToPt();
 	Point2f GetGalvoAngles();

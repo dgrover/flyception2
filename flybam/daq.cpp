@@ -167,12 +167,12 @@ void Daq::write()
 	//DAQmxWriteAnalogScalarF64(taskHandleX, 0, 10.0, dataX, NULL);
 }
 
-void Daq::ConvertPtToDeg(Point2f pt)
-{
-	// move mirror by half the angle
-	thetax = atan(pt.x / (GALVO_Y_HEIGHT + GALVO_XY_DIST)) * 180 / (CV_PI * 2);
-	thetay = atan(pt.y / ( GALVO_Y_HEIGHT / cos(thetax * 2 * CV_PI / 180 ) )  ) * 180 / (CV_PI * 2);
-}
+//void Daq::ConvertPtToDeg(Point2f pt)
+//{
+//	// move mirror by half the angle
+//	thetax = atan(pt.x / (GALVO_Y_HEIGHT + GALVO_XY_DIST)) * 180 / (CV_PI * 2);
+//	thetay = atan(pt.y / ( GALVO_Y_HEIGHT / cos(thetax * 2 * CV_PI / 180 ) )  ) * 180 / (CV_PI * 2);
+//}
 
 void Daq::ConvertPixelToDeg(float x, float y)
 {
@@ -183,10 +183,15 @@ void Daq::ConvertPixelToDeg(float x, float y)
 Point2f Daq::ConvertDegToPt()
 {
 	Point2f pt;
+	float h;
 
 	//final point would be at double the mirror angle
-	pt.x = (GALVO_Y_HEIGHT + GALVO_XY_DIST) * tan(thetax * 2 * CV_PI / 180);
-	pt.y = (GALVO_Y_HEIGHT / cos(thetax * 2 * CV_PI / 180)) * tan(thetay * 2 * CV_PI / 180);
+	//pt.x = (GALVO_Y_HEIGHT + GALVO_XY_DIST) * tan(thetax * 2 * CV_PI / 180);
+	//pt.y = (GALVO_Y_HEIGHT / cos(thetax * 2 * CV_PI / 180)) * tan(thetay * 2 * CV_PI / 180);
+
+	h = ((GALVO_Y_HEIGHT + GALVO_XY_DIST) * cos(thetax * 2 * CV_PI / 180)) - GALVO_XY_DIST;
+	pt.x = (GALVO_XY_DIST + h) * tan(thetax * 2 * CV_PI / 180);
+	pt.y = h * sin(thetay * 2 * CV_PI / 180);
 
 	return pt;
 }
