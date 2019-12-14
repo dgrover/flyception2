@@ -45,7 +45,8 @@ concurrent_queue<Mat> zq;
 concurrent_queue<int> sq;
 concurrent_queue<Image> aq;
 
-ReaderWriterQueue<Mat> arenaDispStream(1), arenaMaskStream(1), flyDispStream(1), flyMaskStream(1), zDispStream(1);
+ReaderWriterQueue<Mat> arenaDispStream(1), arenaMaskStream(1), flyDispStream(1), flyMaskStream(1);
+//ReaderWriterQueue<Mat> arenaDispStream(1), arenaMaskStream(1), flyDispStream(1), flyMaskStream(1), zDispStream(1);
 
 concurrent_queue<fvwritedata> fvwdata;
 concurrent_queue<avwritedata> avwdata;
@@ -640,7 +641,7 @@ int _tmain(int argc, _TCHAR* argv[])
 					fm = varianceOfLaplacian(fly_z_frame);
 					fmq.push(fm);
 
-					zDispStream.try_enqueue(fly_z_frame.clone());
+					//zDispStream.try_enqueue(fly_z_frame.clone());
 				}
 
 				if (!stream)
@@ -1099,7 +1100,7 @@ int _tmain(int argc, _TCHAR* argv[])
 			createTrackbar("angle", "parameters", &el_angle, 180);
 			
 			Mat tframe, tmask;
-			Mat tzframe;
+			//Mat tzframe;
 
 			while (true)
 			{
@@ -1112,8 +1113,8 @@ int _tmain(int argc, _TCHAR* argv[])
 				if (arenaMaskStream.try_dequeue(tmask))
 					imshow("arena mask", tmask);
 
-				if (zDispStream.try_dequeue(tzframe))
-					imshow("z image", tzframe);
+				//if (zDispStream.try_dequeue(tzframe))
+				//	imshow("z image", tzframe);
 				
 				waitKey(1);
 
@@ -1123,7 +1124,7 @@ int _tmain(int argc, _TCHAR* argv[])
 					destroyWindow("parameters");
 					destroyWindow("arena image");
 					destroyWindow("arena mask");
-					destroyWindow("z image");
+					//destroyWindow("z image");
 					break;
 				}
 			}

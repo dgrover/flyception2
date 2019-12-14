@@ -13,31 +13,15 @@
 #include <vector>
 #include <algorithm>
 
-#include <omp.h>
-#include <queue>
-
-
-#include "FlyCapture2.h"
-
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/video.hpp>
 
-#include "pgrcam.h"
-#include "readerwriterqueue.h"
-#include <NIDAQmx.h>
-#include "daq.h"
+#include "fmfreader.h"
 
-#define XVOLTPERDEGREE 0.55
-#define YVOLTPERDEGREE 0.525
-
-#define XOFFSET -0.25		// x-offset for centering galvo to target (in volts)
-#define YOFFSET -0.315		// y-offset for centering galvo to target (in volts)
-
-#define MIN_ANGLE -9.0
-#define MAX_ANGLE 9.0
-#define ANGLE_STEP_SIZE 0.1
+#define MIN_FLY_SIZE 50
+#define FLY_MERGE_MAX_DIST 50
 
 // TODO: reference additional headers your program requires here
