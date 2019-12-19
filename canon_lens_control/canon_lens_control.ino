@@ -12,8 +12,8 @@
  */
 
 // Step size parameters
-int STEP_FINE = 5;
-int STEP_COARSE = 10;
+int STEP_FINE = 1;
+int STEP_COARSE = 2;
 
 // xxxset up the speed, data order and data mode
  SPISettings cameraSetting(10000, MSBFIRST, SPI_MODE2);

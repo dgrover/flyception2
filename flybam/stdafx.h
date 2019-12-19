@@ -61,12 +61,16 @@
 
 #define MAXFVRECFRAMES 1000*100
 #define MAXAVRECFRAMES 50*100
+
 #define FLASHFRAMES 5
 
 #define MIN_MARKER_SIZE 10
 #define MAX_MARKER_SIZE 500
 #define NBEADS 3
 
-#define Z_STEP 10.0
+#define Z_PERIOD 50
+#define Z_EPSILON 5.0
+#define Z_STEP_COARSE 2.0
+#define Z_STEP_FINE 1.0
 
 // TODO: reference additional headers your program requires here

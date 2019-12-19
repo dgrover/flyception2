@@ -14,6 +14,7 @@ bool stream = true;
 
 bool flyview_track = false;
 bool manual_track = false;
+bool z_track = false;
 
 bool flyview_record = false;
 bool arenaview_record = false;
@@ -26,7 +27,9 @@ struct fvwritedata
 	Point2f laser;
 	Point2f head;
 	Point2f galvo_angle;
+	int z_tracking;
 	int lens_pos;
+	double var_lap;
 };
 
 struct avwritedata
@@ -38,19 +41,26 @@ struct avwritedata
 };
 
 concurrent_queue<Mat> q;
+concurrent_queue<Mat> zq;
 concurrent_queue<int> sq;
 concurrent_queue<Image> aq;
 
 ReaderWriterQueue<Mat> arenaDispStream(1), arenaMaskStream(1), flyDispStream(1), flyMaskStream(1);
+//ReaderWriterQueue<Mat> arenaDispStream(1), arenaMaskStream(1), flyDispStream(1), flyMaskStream(1), zDispStream(1);
 
 concurrent_queue<fvwritedata> fvwdata;
 concurrent_queue<avwritedata> avwdata;
 
-Mat frame;
+concurrent_queue<double> fmq;
+
+Mat frame, zframe;
 int stamp;
 
+int z_count = 0;
 int lens_pos = 0;
 char serial_buffer[2] = { 0 };
+
+Rect zROI(240 / 2 - 75, 240 / 2 - 75, 150, 150);
 
 static void AcqCallback(SapXferCallbackInfo *pInfo)
 {
@@ -68,9 +78,15 @@ static void AcqCallback(SapXferCallbackInfo *pInfo)
 
 	Mat tframe(height, width, CV_8U, (void*)pData);
 	frame = tframe.clone();
-
+	
 	sq.push(stamp);
 	q.push(frame);
+	
+	if ((++z_count % Z_PERIOD) == 0)
+	{
+		tframe(zROI).copyTo(zframe);
+		zq.push(zframe);
+	}
 }
 
 void OnImageGrabbed(Image* pImage, const void* pCallbackData)
@@ -84,10 +100,21 @@ void OnImageGrabbed(Image* pImage, const void* pCallbackData)
 	return;
 }
 
+// LAPV algorithm
+double varianceOfLaplacian(const cv::Mat& src)
+{
+	cv::Mat lap;
+	cv::Laplacian(src, lap, CV_64F);
+
+	cv::Scalar mu, sigma;
+	cv::meanStdDev(lap, mu, sigma);
+
+	double focusMeasure = sigma.val[0] * sigma.val[0];
+	return focusMeasure;
+}
+
 int _tmain(int argc, _TCHAR* argv[])
 {
-	
-
 	// initialize camera link gazelle camera
 	SapAcquisition	*Acq	 = NULL;
 	SapBuffer		*Buffers = NULL;
@@ -116,8 +143,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	{
 		printf("Connecting lens controller arduino [OK]\n");
 		while (SP->ReadData(serial_buffer, 2) != -1)
-		{
-		}
+		{ }
 
 		// Query for lens position
 		ndq.lensCommand(7);
@@ -252,7 +278,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	ellipse(outer_mask, el_center, Size(el_maj_axis, el_min_axis), el_angle, 0, 360, Scalar(255, 255, 255), FILLED);
 
 	Mat arena_img, arena_frame, arena_mask, arena_bg;
-	Mat fly_img, fly_frame, fly_fg, fly_mask;
+	Mat fly_img, fly_frame, fly_fg, fly_mask, fly_z_frame;
 
 	Mat arena_mean = Mat::zeros(arena_image_width, arena_image_height, CV_32F);
 
@@ -286,8 +312,11 @@ int _tmain(int argc, _TCHAR* argv[])
 	float d_01, d_02, d_12;
 	bool three_point_tracking = false;
 
+	double fm = 0;
+	double base_fm = 0;
+
 	//Press [F1] to start/stop fly-view tracking, [F2] to start/stop recording, [ESC] to exit.
-	#pragma omp parallel sections num_threads(7)
+	#pragma omp parallel sections num_threads(9)
 	{
 		#pragma omp section
 		{
@@ -550,12 +579,15 @@ int _tmain(int argc, _TCHAR* argv[])
 									flyview_track = false;
 									manual_track = false;
 									three_point_tracking = false;
+									z_track = false;
 									ndq.reset();
 								}
 							}
 						}
 
-						putText(fly_frame, to_string(lens_pos), Point(0, 10), FONT_HERSHEY_COMPLEX, 0.4, Scalar(255, 255, 255));
+						putText(fly_frame, to_string(lens_pos), Point(0, 20), FONT_HERSHEY_COMPLEX, 0.4, Scalar(255, 255, 255));
+						putText(fly_frame, to_string((int)base_fm), Point(0, 30), FONT_HERSHEY_COMPLEX, 0.4, Scalar(255, 255, 255));
+						putText(fly_frame, to_string((int)fm), Point(0, 40), FONT_HERSHEY_COMPLEX, 0.4, Scalar(255, 255, 255));
 
 						putText(fly_frame, to_string((int)fly_fps), Point((fly_image_width - 50), 10), FONT_HERSHEY_COMPLEX, 0.4, Scalar(255, 255, 255));
 						putText(fly_frame, to_string(q.unsafe_size()), Point((fly_image_width - 50), 20), FONT_HERSHEY_COMPLEX, 0.4, Scalar(255, 255, 255));
@@ -576,8 +608,9 @@ int _tmain(int argc, _TCHAR* argv[])
 							fvin.head = pt2d;
 							fvin.laser = wpt;
 							fvin.galvo_angle = galvo_mirror_angle;
+							fvin.z_tracking = z_track;
 							fvin.lens_pos = lens_pos;
-
+							fvin.var_lap = fm;
 							fvwdata.push(fvin);
 							fvrcount++;
 						}
@@ -591,6 +624,353 @@ int _tmain(int argc, _TCHAR* argv[])
 					break;
 			}
 		}
+
+		#pragma omp section
+		{
+			Mat tframe;
+
+			//int count = 0;
+			//double avg_fm = 0;
+
+			while (true)
+			{
+				if (zq.try_pop(tframe))
+				{
+					fly_z_frame = tframe.clone();
+					fm = varianceOfLaplacian(fly_z_frame);
+					fmq.push(fm);
+
+					//zDispStream.try_enqueue(fly_z_frame.clone());
+				}
+
+				if (!stream)
+					break;
+			}
+		}
+
+		//#pragma omp section
+		//{
+		//	double cfm, last_fm;
+		//	bool z_track_init = false;
+
+		//	int z_state = 0;
+		//	int dz = 0;
+		//	int curr_dir;
+
+		//	while (true)
+		//	{
+		//		if (fmq.try_pop(cfm))
+		//		{
+		//			if (z_track)
+		//			{
+		//				if (z_track_init != z_track)
+		//					base_fm = cfm;
+
+		//				double delta = base_fm - cfm;
+
+		//				// Code for 4 state
+		//				switch (z_state)
+		//				{
+		//					case 0:
+		//						if (delta > Z_EPSILON)
+		//						{
+		//							dz = rand() % 2;
+		//							curr_dir = ((dz == 0) ? -1 : 1);
+		//							ndq.lensCommand(dz + 3);
+		//							lens_pos = lens_pos + Z_STEP_FINE * curr_dir;
+		//							z_state = 1;
+
+		//							printf("0 -> 1 %d\n", fvrcount);
+		//						}
+
+		//						break;
+
+		//					case 1:
+		//						if (delta > Z_EPSILON) // If not withing eps
+		//						{
+		//							if (last_fm > cfm) // If worse move two steps the other way
+		//							{
+		//								ndq.lensCommand(2 - dz);
+		//								lens_pos = lens_pos - Z_STEP_COARSE * curr_dir;
+		//								z_state = 2;
+		//								
+		//								printf("1 -> 2 %d\n", fvrcount);
+		//							}
+		//							else // If better try again then init
+		//							{
+		//								ndq.lensCommand(dz + 3);
+		//								lens_pos = lens_pos + Z_STEP_FINE * curr_dir;
+		//								z_state = 0;
+
+		//								printf("1 -> 00 %d\n", fvrcount);
+		//							}
+		//						}
+		//						else // If within eps -> init
+		//						{
+		//							z_state = 0;
+
+		//							printf("1 -> 000 %d\n", fvrcount);
+		//						}
+
+		//						break;
+
+		//					case 2: // Third state only transistions to init 2 -> 0
+		//						if (delta > Z_EPSILON)
+		//						{
+		//							if (last_fm > cfm) // If worse move back to original
+		//							{
+		//								ndq.lensCommand(dz + 3);
+		//								//z_track = false; // Maybe
+		//								lens_pos = lens_pos + Z_STEP_FINE * curr_dir;
+		//								printf("2 -> 0 %d\n\n", fvrcount);
+		//							}
+		//							else
+		//							{
+		//								ndq.lensCommand(4 - dz); // If better try again then init
+		//								lens_pos = lens_pos - Z_STEP_FINE * curr_dir;
+		//								printf("2 -> 00 %d\n", fvrcount);
+		//							}
+		//						}
+		//						else
+		//						{
+		//							printf("2 -> 000 %d\n", fvrcount); // If within eps -> init
+		//						}
+
+		//						z_state = 0;
+
+		//				/* Code for 3-state and terminate
+		//				switch (z_state)
+		//				{
+		//					case 0:
+		//						if (delta > Z_EPSILON)
+		//						{
+		//							dz = rand() % 2;
+		//							curr_dir = ((dz == 0) ? -1 : 1);
+		//							ndq.lensCommand(dz + 2);
+		//							lens_pos = lens_pos + Z_STEP_FINE * curr_dir;
+		//							z_state = 1;
+
+		//							printf("0 -> 1 %d\n", fvrcount);
+		//						}
+
+		//						break;
+
+		//					case 1:
+		//						if (delta > Z_EPSILON) // If not withing eps
+		//						{
+		//							if (last_fm > cfm) // If worse
+		//							{
+		//								ndq.lensCommand((1 - dz));
+		//								z_state = 2;
+		//								lens_pos = lens_pos - Z_STEP_COARSE * curr_dir;
+		//								printf("1 -> 2 %d\n", fvrcount);
+		//							}
+		//							else // If better
+		//							{
+		//								z_state = 0;
+		//								printf("1 -> 0 %d\n", fvrcount);
+		//							}
+		//						}
+		//						else
+		//						{
+		//							z_state = 0;
+		//							printf("1 -> 00 %d\n", fvrcount);
+		//						}
+
+		//						break;
+
+		//					case 2:
+		//						if (delta > Z_EPSILON)
+		//						{
+		//							if (last_fm > cfm)
+		//							{
+		//								ndq.lensCommand(dz + 2);
+		//								z_track = false;
+		//								lens_pos = lens_pos + Z_STEP_FINE * curr_dir;
+
+		//								printf("3 -> 0 %d\n\n", fvrcount);
+		//							}
+		//							else
+		//								printf("3 -> 00 %d\n", fvrcount);
+		//						}
+		//						else
+		//							printf("3 -> 000 %d\n", fvrcount);
+
+		//						z_state = 0;
+
+		//					*/
+
+
+		//					// Code for 1 -> 2 in 2 steps
+		//					//case 2:
+		//					//	if (delta > Z_EPSILON)
+		//					//	{
+		//					//		if (last_fm > cfm)
+		//					//		{
+		//					//			ndq.lensCommand(1 - dz);
+		//					//			z_state = 3;
+
+		//					//			printf("2 -> 3 %d\n", fvrcount);
+		//					//		}
+		//					//		else
+		//					//		{
+		//					//			z_state = 0;
+
+		//					//			printf("2 -> 0 %d\n", fvrcount);
+		//					//		}
+		//					//	}
+		//					//	else
+		//					//	{
+		//					//		z_state = 0;
+
+		//					//		printf("2 -> 00 %d\n", fvrcount);
+		//					//	}
+		//					//	
+		//					//	break;
+
+		//					//case 3:
+		//					//	if (delta > Z_EPSILON)
+		//					//	{
+		//					//		if (last_fm > cfm)
+		//					//		{
+		//					//			ndq.lensCommand(dz);
+		//					//			z_track = false;
+
+		//					//			printf("3 -> 0 %d\n\n", fvrcount);
+		//					//		}
+		//					//		else
+		//					//			printf("3 -> 00 %d\n", fvrcount);
+		//					//	}
+		//					//	else
+		//					//		printf("3 -> 000 %d\n", fvrcount);
+
+		//					//	z_state = 0;
+
+		//					//	break;
+
+		//				}
+		//			}
+		//			else
+		//			{
+		//				base_fm = 0;
+		//				z_state = 0;
+		//			}
+
+		//			last_fm = cfm;
+		//			z_track_init = z_track;
+		//		}
+
+		//		if (!stream)
+		//			break;
+		//	}
+		//}
+
+		#pragma omp section
+		{
+			double cfm, last_fm;
+			//bool z_track_init = false;
+
+			int z_state = 0;
+			int dz = 0;
+			int curr_dir;
+
+			while (true)
+			{
+				if (fmq.try_pop(cfm))
+				{
+					if (z_track)
+					{
+						//if (z_track_init != z_track)
+						//	base_fm = cfm;
+
+						double delta = base_fm - cfm;
+
+						// Code for 4 state
+						switch (z_state)
+						{
+						case 0:
+							if (delta > Z_EPSILON)
+							{
+								dz = rand() % 2;
+								curr_dir = ((dz == 0) ? -1 : 1);
+								ndq.lensCommand(dz + 3);
+								lens_pos = lens_pos + Z_STEP_FINE * curr_dir;
+								z_state = 1;
+
+								//printf("0 -> 1 %d\n", fvrcount);
+							}
+
+							break;
+
+						case 1:
+							if (delta > Z_EPSILON) // If not withing eps
+							{
+								if (last_fm > cfm) // If worse move two steps the other way
+								{
+									ndq.lensCommand(2 - dz);
+									lens_pos = lens_pos - Z_STEP_COARSE * curr_dir;
+									z_state = 2;
+
+									//printf("1 -> 2 %d\n", fvrcount);
+								}
+								else // If better try again then init
+								{
+									ndq.lensCommand(dz + 3);
+									lens_pos = lens_pos + Z_STEP_FINE * curr_dir;
+									z_state = 0;
+
+									//printf("1 -> 00 %d\n", fvrcount);
+								}
+							}
+							else // If within eps -> init
+							{
+								z_state = 0;
+
+								//printf("1 -> 000 %d\n", fvrcount);
+							}
+
+							break;
+
+						case 2: // Third state only transistions to init 2 -> 0
+							if (delta > Z_EPSILON)
+							{
+								if (last_fm > cfm) // If worse move back to original
+								{
+									ndq.lensCommand(dz + 3);
+									//z_track = false; // Maybe
+									lens_pos = lens_pos + Z_STEP_FINE * curr_dir;
+									//printf("2 -> 0 %d\n\n", fvrcount);
+								}
+								else
+								{
+									ndq.lensCommand(4 - dz); // If better try again then init
+									lens_pos = lens_pos - Z_STEP_FINE * curr_dir;
+									//printf("2 -> 00 %d\n", fvrcount);
+								}
+							}
+							//else
+							//{
+								//printf("2 -> 000 %d\n", fvrcount); // If within eps -> init
+							//}
+
+							z_state = 0;
+						}
+					}
+					else
+					{
+						//base_fm = 0;
+						z_state = 0;
+					}
+
+					last_fm = cfm;
+					//z_track_init = z_track;
+				}
+
+				if (!stream)
+					break;
+			}
+		}
+
 
 		#pragma omp section
 		{
@@ -757,8 +1137,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 					fvfout.WriteFrame(out.img);
 					fvfout.WriteLog(out.stamp);
-					fvfout.WriteTraj(out.laser, out.head, out.galvo_angle, out.lens_pos);
-					
+					fvfout.WriteTraj(out.laser, out.head, out.galvo_angle, out.z_tracking, out.lens_pos, out.var_lap);
 					fvfout.nframes++;
 				}
 				else
@@ -826,6 +1205,7 @@ int _tmain(int argc, _TCHAR* argv[])
 			createTrackbar("angle", "parameters", &el_angle, 180);
 			
 			Mat tframe, tmask;
+			//Mat tzframe;
 
 			while (true)
 			{
@@ -837,6 +1217,9 @@ int _tmain(int argc, _TCHAR* argv[])
 
 				if (arenaMaskStream.try_dequeue(tmask))
 					imshow("arena mask", tmask);
+
+				//if (zDispStream.try_dequeue(tzframe))
+				//	imshow("z image", tzframe);
 				
 				waitKey(1);
 
@@ -846,6 +1229,7 @@ int _tmain(int argc, _TCHAR* argv[])
 					destroyWindow("parameters");
 					destroyWindow("arena image");
 					destroyWindow("arena mask");
+					//destroyWindow("z image");
 					break;
 				}
 			}
@@ -881,6 +1265,9 @@ int _tmain(int argc, _TCHAR* argv[])
 			int flash_key_state = 0;
 			int bg_key_state = 0;
 			int fly_key_state = 0;
+			
+			int z_base_key_state = 0;
+			int z_track_key_state = 0;
 
 			int inc_foc_state = 0;
 			int dec_foc_state = 0;
@@ -894,11 +1281,13 @@ int _tmain(int argc, _TCHAR* argv[])
 			{
 				if (GetAsyncKeyState(VK_NUMPAD1))
 				{
+					z_track = false;
+
 					if (!inc_foc_state)
 					{
-						if ((lens_pos - Z_STEP) >= 0)
+						if ((lens_pos - Z_STEP_COARSE) >= 0)
 						{
-							lens_pos -= Z_STEP;
+							lens_pos -= Z_STEP_COARSE;
 							ndq.lensCommand(1); // 1: Move step (coarse) toward max lens position -> move focal plane toward camera
 						}
 					}
@@ -910,10 +1299,12 @@ int _tmain(int argc, _TCHAR* argv[])
 
 				if (GetAsyncKeyState(VK_NUMPAD2))
 				{
+					z_track = false;
+
 					if (!dec_foc_state) 
 					{
 						ndq.lensCommand(2); // 2: Move step (coarse) toward min lens position -> move focal plane toward backlight
-						lens_pos += Z_STEP;
+						lens_pos += Z_STEP_COARSE;
 					}
 					
 					dec_foc_state = 1;
@@ -924,6 +1315,8 @@ int _tmain(int argc, _TCHAR* argv[])
 				// Max lens position -> min focal toward camera (-z up)
 				if (GetAsyncKeyState(VK_NUMPAD4))
 				{
+					z_track = false;
+
 					if (!max_foc_state)
 					{
 						lens_pos = 0;
@@ -938,6 +1331,8 @@ int _tmain(int argc, _TCHAR* argv[])
 				// Min lens position -> max focal toward backlight (+z down)
 				if (GetAsyncKeyState(VK_NUMPAD5))
 				{
+					z_track = false;
+
 					if (!min_foc_state)
 					{
 						lens_pos = 9999;
@@ -963,6 +1358,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 						manual_track = false;
 						flyview_track = false;
+						z_track = false;
 					}
 
 					fly_key_state = 1;
@@ -975,6 +1371,7 @@ int _tmain(int argc, _TCHAR* argv[])
 				if ((1 << 15) & leftKeyState)
 				{
 					flyview_track = false;
+					z_track = false;
 					manual_track = true;
 					ndq.MoveLeft();
 					ndq.write();
@@ -985,6 +1382,7 @@ int _tmain(int argc, _TCHAR* argv[])
 				if ((1 << 15) & rightKeyState)
 				{
 					flyview_track = false;
+					z_track = false;
 					manual_track = true;
 					ndq.MoveRight();
 					ndq.write();
@@ -995,6 +1393,7 @@ int _tmain(int argc, _TCHAR* argv[])
 				if ((1 << 15) & upKeyState)
 				{
 					flyview_track = false;
+					z_track = false;
 					manual_track = true;
 					ndq.MoveUp();
 					ndq.write();
@@ -1005,6 +1404,7 @@ int _tmain(int argc, _TCHAR* argv[])
 				if ((1 << 15) & downKeyState)
 				{
 					flyview_track = false;
+					z_track = false;
 					manual_track = true;
 					ndq.MoveDown();
 					ndq.write();
@@ -1050,6 +1450,26 @@ int _tmain(int argc, _TCHAR* argv[])
 				else
 					bg_key_state = 0;
 
+				if (GetAsyncKeyState(VK_F6))
+				{
+					if (!z_base_key_state)
+						base_fm = fm;
+
+					z_base_key_state = 1;
+				}
+				else
+					z_base_key_state = 0;
+
+				if (GetAsyncKeyState(VK_F7))
+				{
+					if (!z_track_key_state)
+						z_track = !z_track;
+
+					z_track_key_state = 1;
+				}
+				else
+					z_track_key_state = 0;
+
 				if (GetAsyncKeyState(VK_ESCAPE))
 				{
 					stream = false;
@@ -1062,6 +1482,7 @@ int _tmain(int argc, _TCHAR* argv[])
 					{
 						fvrcount = 0;
 						flyview_record = false;
+						z_track = false;
 					}
 				}
 
@@ -1090,6 +1511,7 @@ int _tmain(int argc, _TCHAR* argv[])
 					if (!reset_galvo_state)
 					{
 						flyview_track = false;
+						z_track = false;
 						manual_track = true;
 						ndq.reset();
 						ndq.write();
