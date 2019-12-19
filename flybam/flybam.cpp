@@ -649,10 +649,227 @@ int _tmain(int argc, _TCHAR* argv[])
 			}
 		}
 
+		//#pragma omp section
+		//{
+		//	double cfm, last_fm;
+		//	bool z_track_init = false;
+
+		//	int z_state = 0;
+		//	int dz = 0;
+		//	int curr_dir;
+
+		//	while (true)
+		//	{
+		//		if (fmq.try_pop(cfm))
+		//		{
+		//			if (z_track)
+		//			{
+		//				if (z_track_init != z_track)
+		//					base_fm = cfm;
+
+		//				double delta = base_fm - cfm;
+
+		//				// Code for 4 state
+		//				switch (z_state)
+		//				{
+		//					case 0:
+		//						if (delta > Z_EPSILON)
+		//						{
+		//							dz = rand() % 2;
+		//							curr_dir = ((dz == 0) ? -1 : 1);
+		//							ndq.lensCommand(dz + 3);
+		//							lens_pos = lens_pos + Z_STEP_FINE * curr_dir;
+		//							z_state = 1;
+
+		//							printf("0 -> 1 %d\n", fvrcount);
+		//						}
+
+		//						break;
+
+		//					case 1:
+		//						if (delta > Z_EPSILON) // If not withing eps
+		//						{
+		//							if (last_fm > cfm) // If worse move two steps the other way
+		//							{
+		//								ndq.lensCommand(2 - dz);
+		//								lens_pos = lens_pos - Z_STEP_COARSE * curr_dir;
+		//								z_state = 2;
+		//								
+		//								printf("1 -> 2 %d\n", fvrcount);
+		//							}
+		//							else // If better try again then init
+		//							{
+		//								ndq.lensCommand(dz + 3);
+		//								lens_pos = lens_pos + Z_STEP_FINE * curr_dir;
+		//								z_state = 0;
+
+		//								printf("1 -> 00 %d\n", fvrcount);
+		//							}
+		//						}
+		//						else // If within eps -> init
+		//						{
+		//							z_state = 0;
+
+		//							printf("1 -> 000 %d\n", fvrcount);
+		//						}
+
+		//						break;
+
+		//					case 2: // Third state only transistions to init 2 -> 0
+		//						if (delta > Z_EPSILON)
+		//						{
+		//							if (last_fm > cfm) // If worse move back to original
+		//							{
+		//								ndq.lensCommand(dz + 3);
+		//								//z_track = false; // Maybe
+		//								lens_pos = lens_pos + Z_STEP_FINE * curr_dir;
+		//								printf("2 -> 0 %d\n\n", fvrcount);
+		//							}
+		//							else
+		//							{
+		//								ndq.lensCommand(4 - dz); // If better try again then init
+		//								lens_pos = lens_pos - Z_STEP_FINE * curr_dir;
+		//								printf("2 -> 00 %d\n", fvrcount);
+		//							}
+		//						}
+		//						else
+		//						{
+		//							printf("2 -> 000 %d\n", fvrcount); // If within eps -> init
+		//						}
+
+		//						z_state = 0;
+
+		//				/* Code for 3-state and terminate
+		//				switch (z_state)
+		//				{
+		//					case 0:
+		//						if (delta > Z_EPSILON)
+		//						{
+		//							dz = rand() % 2;
+		//							curr_dir = ((dz == 0) ? -1 : 1);
+		//							ndq.lensCommand(dz + 2);
+		//							lens_pos = lens_pos + Z_STEP_FINE * curr_dir;
+		//							z_state = 1;
+
+		//							printf("0 -> 1 %d\n", fvrcount);
+		//						}
+
+		//						break;
+
+		//					case 1:
+		//						if (delta > Z_EPSILON) // If not withing eps
+		//						{
+		//							if (last_fm > cfm) // If worse
+		//							{
+		//								ndq.lensCommand((1 - dz));
+		//								z_state = 2;
+		//								lens_pos = lens_pos - Z_STEP_COARSE * curr_dir;
+		//								printf("1 -> 2 %d\n", fvrcount);
+		//							}
+		//							else // If better
+		//							{
+		//								z_state = 0;
+		//								printf("1 -> 0 %d\n", fvrcount);
+		//							}
+		//						}
+		//						else
+		//						{
+		//							z_state = 0;
+		//							printf("1 -> 00 %d\n", fvrcount);
+		//						}
+
+		//						break;
+
+		//					case 2:
+		//						if (delta > Z_EPSILON)
+		//						{
+		//							if (last_fm > cfm)
+		//							{
+		//								ndq.lensCommand(dz + 2);
+		//								z_track = false;
+		//								lens_pos = lens_pos + Z_STEP_FINE * curr_dir;
+
+		//								printf("3 -> 0 %d\n\n", fvrcount);
+		//							}
+		//							else
+		//								printf("3 -> 00 %d\n", fvrcount);
+		//						}
+		//						else
+		//							printf("3 -> 000 %d\n", fvrcount);
+
+		//						z_state = 0;
+
+		//					*/
+
+
+		//					// Code for 1 -> 2 in 2 steps
+		//					//case 2:
+		//					//	if (delta > Z_EPSILON)
+		//					//	{
+		//					//		if (last_fm > cfm)
+		//					//		{
+		//					//			ndq.lensCommand(1 - dz);
+		//					//			z_state = 3;
+
+		//					//			printf("2 -> 3 %d\n", fvrcount);
+		//					//		}
+		//					//		else
+		//					//		{
+		//					//			z_state = 0;
+
+		//					//			printf("2 -> 0 %d\n", fvrcount);
+		//					//		}
+		//					//	}
+		//					//	else
+		//					//	{
+		//					//		z_state = 0;
+
+		//					//		printf("2 -> 00 %d\n", fvrcount);
+		//					//	}
+		//					//	
+		//					//	break;
+
+		//					//case 3:
+		//					//	if (delta > Z_EPSILON)
+		//					//	{
+		//					//		if (last_fm > cfm)
+		//					//		{
+		//					//			ndq.lensCommand(dz);
+		//					//			z_track = false;
+
+		//					//			printf("3 -> 0 %d\n\n", fvrcount);
+		//					//		}
+		//					//		else
+		//					//			printf("3 -> 00 %d\n", fvrcount);
+		//					//	}
+		//					//	else
+		//					//		printf("3 -> 000 %d\n", fvrcount);
+
+		//					//	z_state = 0;
+
+		//					//	break;
+
+		//				}
+		//			}
+		//			else
+		//			{
+		//				base_fm = 0;
+		//				z_state = 0;
+		//			}
+
+		//			last_fm = cfm;
+		//			z_track_init = z_track;
+		//		}
+
+		//		if (!stream)
+		//			break;
+		//	}
+		//}
+
 		#pragma omp section
 		{
 			double cfm, last_fm;
-			bool z_track_init = false;
+			//bool z_track_init = false;
 
 			int z_state = 0;
 			int dz = 0;
@@ -664,207 +881,97 @@ int _tmain(int argc, _TCHAR* argv[])
 				{
 					if (z_track)
 					{
-						if (z_track_init != z_track)
-							base_fm = cfm;
+						//if (z_track_init != z_track)
+						//	base_fm = cfm;
 
 						double delta = base_fm - cfm;
 
 						// Code for 4 state
 						switch (z_state)
 						{
-							case 0:
-								if (delta > Z_EPSILON)
+						case 0:
+							if (delta > Z_EPSILON)
+							{
+								dz = rand() % 2;
+								curr_dir = ((dz == 0) ? -1 : 1);
+								ndq.lensCommand(dz + 3);
+								lens_pos = lens_pos + Z_STEP_FINE * curr_dir;
+								z_state = 1;
+
+								//printf("0 -> 1 %d\n", fvrcount);
+							}
+
+							break;
+
+						case 1:
+							if (delta > Z_EPSILON) // If not withing eps
+							{
+								if (last_fm > cfm) // If worse move two steps the other way
 								{
-									dz = rand() % 2;
-									curr_dir = ((dz == 0) ? -1 : 1);
+									ndq.lensCommand(2 - dz);
+									lens_pos = lens_pos - Z_STEP_COARSE * curr_dir;
+									z_state = 2;
+
+									//printf("1 -> 2 %d\n", fvrcount);
+								}
+								else // If better try again then init
+								{
 									ndq.lensCommand(dz + 3);
 									lens_pos = lens_pos + Z_STEP_FINE * curr_dir;
-									z_state = 1;
-
-									printf("0 -> 1 %d\n", fvrcount);
-								}
-
-								break;
-
-							case 1:
-								if (delta > Z_EPSILON) // If not withing eps
-								{
-									if (last_fm > cfm) // If worse move two steps the other way
-									{
-										ndq.lensCommand(2 - dz);
-										lens_pos = lens_pos - Z_STEP_COARSE * curr_dir;
-										z_state = 2;
-										
-										printf("1 -> 2 %d\n", fvrcount);
-									}
-									else // If better try again then init
-									{
-										ndq.lensCommand(dz + 3);
-										lens_pos = lens_pos + Z_STEP_FINE * curr_dir;
-										z_state = 0;
-
-										printf("1 -> 00 %d\n", fvrcount);
-									}
-								}
-								else // If within eps -> init
-								{
 									z_state = 0;
 
-									printf("1 -> 000 %d\n", fvrcount);
+									//printf("1 -> 00 %d\n", fvrcount);
 								}
-
-								break;
-
-							case 2: // Third state only transistions to init 2 -> 0
-								if (delta > Z_EPSILON)
-								{
-									if (last_fm > cfm) // If worse move back to original
-									{
-										ndq.lensCommand(dz + 3);
-										//z_track = false; // Maybe
-										lens_pos = lens_pos + Z_STEP_FINE * curr_dir;
-										printf("2 -> 0 %d\n\n", fvrcount);
-									}
-									else
-									{
-										ndq.lensCommand(4 - dz); // If better try again then init
-										lens_pos = lens_pos - Z_STEP_FINE * curr_dir;
-										printf("2 -> 00 %d\n", fvrcount);
-									}
-								}
-								else
-								{
-									printf("2 -> 000 %d\n", fvrcount); // If within eps -> init
-								}
-
+							}
+							else // If within eps -> init
+							{
 								z_state = 0;
 
-						/* Code for 3-state and terminate
-						switch (z_state)
-						{
-							case 0:
-								if (delta > Z_EPSILON)
+								//printf("1 -> 000 %d\n", fvrcount);
+							}
+
+							break;
+
+						case 2: // Third state only transistions to init 2 -> 0
+							if (delta > Z_EPSILON)
+							{
+								if (last_fm > cfm) // If worse move back to original
 								{
-									dz = rand() % 2;
-									curr_dir = ((dz == 0) ? -1 : 1);
-									ndq.lensCommand(dz + 2);
+									ndq.lensCommand(dz + 3);
+									//z_track = false; // Maybe
 									lens_pos = lens_pos + Z_STEP_FINE * curr_dir;
-									z_state = 1;
-
-									printf("0 -> 1 %d\n", fvrcount);
-								}
-
-								break;
-
-							case 1:
-								if (delta > Z_EPSILON) // If not withing eps
-								{
-									if (last_fm > cfm) // If worse
-									{
-										ndq.lensCommand((1 - dz));
-										z_state = 2;
-										lens_pos = lens_pos - Z_STEP_COARSE * curr_dir;
-										printf("1 -> 2 %d\n", fvrcount);
-									}
-									else // If better
-									{
-										z_state = 0;
-										printf("1 -> 0 %d\n", fvrcount);
-									}
+									//printf("2 -> 0 %d\n\n", fvrcount);
 								}
 								else
 								{
-									z_state = 0;
-									printf("1 -> 00 %d\n", fvrcount);
+									ndq.lensCommand(4 - dz); // If better try again then init
+									lens_pos = lens_pos - Z_STEP_FINE * curr_dir;
+									//printf("2 -> 00 %d\n", fvrcount);
 								}
+							}
+							//else
+							//{
+								//printf("2 -> 000 %d\n", fvrcount); // If within eps -> init
+							//}
 
-								break;
-
-							case 2:
-								if (delta > Z_EPSILON)
-								{
-									if (last_fm > cfm)
-									{
-										ndq.lensCommand(dz + 2);
-										z_track = false;
-										lens_pos = lens_pos + Z_STEP_FINE * curr_dir;
-
-										printf("3 -> 0 %d\n\n", fvrcount);
-									}
-									else
-										printf("3 -> 00 %d\n", fvrcount);
-								}
-								else
-									printf("3 -> 000 %d\n", fvrcount);
-
-								z_state = 0;
-
-							*/
-
-
-							// Code for 1 -> 2 in 2 steps
-							//case 2:
-							//	if (delta > Z_EPSILON)
-							//	{
-							//		if (last_fm > cfm)
-							//		{
-							//			ndq.lensCommand(1 - dz);
-							//			z_state = 3;
-
-							//			printf("2 -> 3 %d\n", fvrcount);
-							//		}
-							//		else
-							//		{
-							//			z_state = 0;
-
-							//			printf("2 -> 0 %d\n", fvrcount);
-							//		}
-							//	}
-							//	else
-							//	{
-							//		z_state = 0;
-
-							//		printf("2 -> 00 %d\n", fvrcount);
-							//	}
-							//	
-							//	break;
-
-							//case 3:
-							//	if (delta > Z_EPSILON)
-							//	{
-							//		if (last_fm > cfm)
-							//		{
-							//			ndq.lensCommand(dz);
-							//			z_track = false;
-
-							//			printf("3 -> 0 %d\n\n", fvrcount);
-							//		}
-							//		else
-							//			printf("3 -> 00 %d\n", fvrcount);
-							//	}
-							//	else
-							//		printf("3 -> 000 %d\n", fvrcount);
-
-							//	z_state = 0;
-
-							//	break;
-
+							z_state = 0;
 						}
 					}
 					else
 					{
-						base_fm = 0;
+						//base_fm = 0;
 						z_state = 0;
 					}
 
 					last_fm = cfm;
-					z_track_init = z_track;
+					//z_track_init = z_track;
 				}
 
 				if (!stream)
 					break;
 			}
 		}
+
 
 		#pragma omp section
 		{
@@ -1160,6 +1267,8 @@ int _tmain(int argc, _TCHAR* argv[])
 			int flash_key_state = 0;
 			int bg_key_state = 0;
 			int fly_key_state = 0;
+			
+			int z_base_key_state = 0;
 			int z_track_key_state = 0;
 
 			int inc_foc_state = 0;
@@ -1345,6 +1454,16 @@ int _tmain(int argc, _TCHAR* argv[])
 
 				if (GetAsyncKeyState(VK_F6))
 				{
+					if (!z_base_key_state)
+						base_fm = fm;
+
+					z_base_key_state = 1;
+				}
+				else
+					z_base_key_state = 0;
+
+				if (GetAsyncKeyState(VK_F7))
+				{
 					if (!z_track_key_state)
 						z_track = !z_track;
 
@@ -1365,6 +1484,7 @@ int _tmain(int argc, _TCHAR* argv[])
 					{
 						fvrcount = 0;
 						flyview_record = false;
+						z_track = false;
 					}
 				}
 
